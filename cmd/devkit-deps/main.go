@@ -1,11 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"os"
+
+	"devkit-deps/internal/cli"
 )
 
 func main() {
-	fmt.Fprintln(os.Stderr, "devkit-deps: not implemented")
-	os.Exit(2)
+	os.Exit(cli.Main(os.Args[1:]))
 }

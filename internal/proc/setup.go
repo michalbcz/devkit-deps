@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -170,14 +171,42 @@ func killGroup(cmd *exec.Cmd) {
 }
 
 type signalKey struct{}
+type signalBoxKey struct{}
+
+type SignalBox struct {
+	mu  sync.Mutex
+	sig syscall.Signal
+	set bool
+}
+
+func (b *SignalBox) Store(sig syscall.Signal) {
+	if b == nil {
+		return
+	}
+	b.mu.Lock()
+	b.sig = sig
+	b.set = true
+	b.mu.Unlock()
+}
 
 func WithSignal(ctx context.Context, sig syscall.Signal) context.Context {
 	return context.WithValue(ctx, signalKey{}, sig)
 }
 
+func WithSignalBox(ctx context.Context, box *SignalBox) context.Context {
+	return context.WithValue(ctx, signalBoxKey{}, box)
+}
+
 func SignalOf(ctx context.Context) (syscall.Signal, bool) { return signalOf(ctx) }
 
 func signalOf(ctx context.Context) (syscall.Signal, bool) {
+	if box, ok := ctx.Value(signalBoxKey{}).(*SignalBox); ok && box != nil {
+		box.mu.Lock()
+		defer box.mu.Unlock()
+		if box.set {
+			return box.sig, true
+		}
+	}
 	sig, ok := ctx.Value(signalKey{}).(syscall.Signal)
 	return sig, ok
 }
