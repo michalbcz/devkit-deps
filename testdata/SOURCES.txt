@@ -1,0 +1,9 @@
+Baseline commit: 2bfc2df7020f5ce041cfbe7cb1d6b65440b22979
+https://github.com/michalbcz/majkl-devkit
+
+src/main/kotlin/services/ManagedDynamicDependencySamples.kt
+src/main/kotlin/services/ManagedMiscDependencySamples.kt
+src/main/kotlin/services/ManagedSourceDependencySamples.kt
+
+levenshtein.raku and lustache.lua are the SPEC.md section 12 scripts. Their expected sentences differ from the longer desktop samples.
+quote-cwd.go is the caller-cwd companion for quote.go and uses the same module pin.
