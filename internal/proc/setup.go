@@ -175,6 +175,8 @@ func WithSignal(ctx context.Context, sig syscall.Signal) context.Context {
 	return context.WithValue(ctx, signalKey{}, sig)
 }
 
+func SignalOf(ctx context.Context) (syscall.Signal, bool) { return signalOf(ctx) }
+
 func signalOf(ctx context.Context) (syscall.Signal, bool) {
 	sig, ok := ctx.Value(signalKey{}).(syscall.Signal)
 	return sig, ok
