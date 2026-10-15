@@ -1,0 +1,5 @@
+devkit-deps reimplements the managed script-dependency behavior of
+Majkl DevKit (https://github.com/michalbcz/majkl-devkit)
+commit 2bfc2df7020f5ce041cfbe7cb1d6b65440b22979.
+That work is licensed under the Apache License, Version 2.0.
+See LICENSE.txt.
