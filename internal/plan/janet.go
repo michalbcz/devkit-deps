@@ -38,6 +38,7 @@ func planJanet(doc Document, pkgs []validate.Package, host discover.Host, policy
 		argv := []string{host.Runtime.Path, script, "--tree=" + tree, "install", pkg.Spec}
 		doc.Setup = append(doc.Setup, step(argv, envDir, setupEnv, nil))
 	}
+	doc.RequiredFiles = []string{"janet"}
 	doc.Execution.Argv = append([]string{host.Runtime.Path, policy.Script}, policy.ScriptArgs...)
 	doc.Execution.Environment = managed(envDir, map[string]string{"JANET_PATH": filepath.Join(tree, "lib")})
 	return doc, nil

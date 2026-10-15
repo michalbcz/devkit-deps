@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"devkit-deps/internal/diag"
 	"devkit-deps/internal/plan"
 )
@@ -110,6 +112,11 @@ func Launch(ctx context.Context, doc plan.Document, stdin io.Reader, stdout, std
 	if err := cmd.Start(); err != nil {
 		return 0, launchFailed(err.Error())
 	}
+	restoreForeground := func() {}
+	if tty, ok := stdin.(*os.File); ok && cmd.Process != nil {
+		restoreForeground = claimForeground(tty, cmd.Process.Pid)
+	}
+	defer restoreForeground()
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
 
@@ -154,10 +161,28 @@ func stopChild(ctx context.Context, cmd *exec.Cmd, done <-chan error) (int, *dia
 }
 
 func signalExit(sig syscall.Signal) int {
-	if sig == syscall.SIGINT {
-		return 130
+	if sig <= 0 {
+		return 1
 	}
-	return 143
+	return 128 + int(sig)
+}
+
+func claimForeground(tty *os.File, pid int) func() {
+	if tty == nil || pid <= 0 {
+		return func() {}
+	}
+	fd := int(tty.Fd())
+	old, err := unix.IoctlGetInt(fd, unix.TIOCGPGRP)
+	if err != nil {
+		return func() {}
+	}
+	if err := unix.IoctlSetPointerInt(fd, unix.TIOCSPGRP, pid); err != nil {
+		return func() {}
+	}
+	_ = syscall.Kill(-pid, syscall.SIGCONT)
+	return func() {
+		_ = unix.IoctlSetPointerInt(fd, unix.TIOCSPGRP, old)
+	}
 }
 
 func finishExit(err error) (int, *diag.Diagnostic) {

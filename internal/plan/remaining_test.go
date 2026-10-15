@@ -84,6 +84,9 @@ func TestPowerShellPlanQuotesPaths(t *testing.T) {
 	if !strings.Contains(run, "exit $LASTEXITCODE") || !strings.Contains(run, "/work/a.ps1") || !strings.Contains(run, "o''hara") {
 		t.Fatalf("%s", run)
 	}
+	if strings.Contains(run, "param(") || !strings.Contains(run, "@args") {
+		t.Fatalf("wrapper must forward raw arguments\n%s", run)
+	}
 	want := []string{host.Runtime.Path, "-NoProfile", "-NonInteractive", "-File", filepath.Join(e, "run.ps1"), "a b"}
 	if !reflect.DeepEqual(doc.Execution.Argv, want) {
 		t.Fatalf("%#v", doc.Execution.Argv)
@@ -242,5 +245,54 @@ func TestPixiRejectsUnknownCPU(t *testing.T) {
 	})
 	if d == nil || d.Code != "platform.unsupported" || d.Exit != 3 {
 		t.Fatalf("%+v", d)
+	}
+}
+
+func TestInstallRootsAreRequired(t *testing.T) {
+	cases := []struct {
+		id   lang.ID
+		spec string
+		root string
+	}{
+		{lang.Perl, "Try::Tiny@0.32", "perl/lib/perl5"},
+		{lang.Raku, "Text::Levenshtein@0.2.4", "raku"},
+		{lang.Janet, "git::https://github.com/janet-lang/spork.git::v1.3.0", "janet"},
+		{lang.Lua, "lustache@1.3.1-0", "lua"},
+		{lang.PowerShell, "powershell-yaml@0.4.12", "modules"},
+		{lang.Red, "https://github.com/rebolek/red-tools.git#565774c8fb6f1817e04393fa5f034fe6d363c17f", "sources/0"},
+	}
+	for _, tc := range cases {
+		host := fixedHost(tc.id, "/selected/"+string(tc.id), managerFor(tc.id))
+		if tc.id == lang.Lua {
+			host.Runtime.Version = "Lua 5.4.7"
+		}
+		doc, d := plan.Build(parse.Declaration{Kind: parse.KindDependencies}, mustPkgs(t, tc.id, tc.spec), host, plan.Policy{
+			CacheRoot: "/cache/devkit-deps", Script: "/work/a", CallerCwd: "/caller",
+		})
+		if d != nil {
+			t.Fatalf("%s: %+v", tc.id, d)
+		}
+		if !reflect.DeepEqual(doc.RequiredFiles, []string{tc.root}) {
+			t.Fatalf("%s required %#v", tc.id, doc.RequiredFiles)
+		}
+	}
+}
+
+func managerFor(id lang.ID) string {
+	switch id {
+	case lang.Perl:
+		return "cpanm"
+	case lang.Raku:
+		return "zef"
+	case lang.Janet:
+		return "jpm"
+	case lang.Lua:
+		return "luarocks"
+	case lang.PowerShell:
+		return "pwsh"
+	case lang.Red:
+		return "git"
+	default:
+		return string(id)
 	}
 }

@@ -54,6 +54,25 @@ func TestUnknownCPURejected(t *testing.T) {
 	}
 }
 
+func TestReadyAcceptsRequiredDirectory(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "perl", "lib", "perl5"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteReady(dir, Ready{Schema: 1, Captured: map[string]string{}, RequiredFiles: []string{"perl/lib/perl5"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadReady(dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(dir, "perl")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadReady(dir); err == nil {
+		t.Fatal("deleted install directory must be incomplete")
+	}
+}
+
 func TestReadyRejectsMissingRequiredFile(t *testing.T) {
 	dir := t.TempDir()
 	if err := WriteReady(dir, Ready{Schema: 1, Captured: map[string]string{}, RequiredFiles: []string{"php/vendor/autoload.php"}}); err != nil {

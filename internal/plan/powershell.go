@@ -25,11 +25,11 @@ func planPowerShell(doc Document, pkgs []validate.Package, host discover.Host, p
 		prepare.WriteString("Save-PSResource -Name " + psQuote(pkg.Name) + " -Version " + psQuote(pkg.Version) + " -Repository PSGallery -Path " + psQuote(modules) + " -TrustRepository -Confirm:$false -ErrorAction Stop\n")
 	}
 	var run strings.Builder
-	run.WriteString("param([Parameter(ValueFromRemainingArguments = $true)][string[]]$ScriptArgs)\n")
 	run.WriteString("$ErrorActionPreference = 'Stop'\n")
 	run.WriteString("$env:PSModulePath = " + psQuote(modules) + " + [IO.Path]::PathSeparator + (Join-Path $PSHOME 'Modules')\n")
-	run.WriteString("& " + psQuote(host.Runtime.Path) + " -NoProfile -NonInteractive -File " + psQuote(policy.Script) + " @ScriptArgs\n")
+	run.WriteString("& " + psQuote(host.Runtime.Path) + " -NoProfile -NonInteractive -File " + psQuote(policy.Script) + " @args\n")
 	run.WriteString("exit $LASTEXITCODE\n")
+	doc.RequiredFiles = []string{"modules"}
 	doc.Files = []FileDoc{
 		{Path: "prepare.ps1", Body: prepare.String()},
 		{Path: "run.ps1", Body: run.String()},

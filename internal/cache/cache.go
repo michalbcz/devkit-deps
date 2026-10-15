@@ -169,7 +169,7 @@ func ReadReady(envDir string) (Ready, error) {
 	for _, rel := range ready.RequiredFiles {
 		path := filepath.Join(envDir, rel)
 		info, err := os.Lstat(path)
-		if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		if err != nil || info.Mode()&os.ModeSymlink != 0 || (!info.Mode().IsRegular() && !info.IsDir()) {
 			return Ready{}, incomplete("required file is missing: " + rel)
 		}
 	}

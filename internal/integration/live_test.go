@@ -174,7 +174,7 @@ func removeRequired(t *testing.T, env string) {
 	if len(ready.RequiredFiles) > 0 {
 		target = filepath.Join(env, filepath.FromSlash(ready.RequiredFiles[0]))
 	}
-	if err := os.Remove(target); err != nil {
+	if err := os.RemoveAll(target); err != nil {
 		t.Fatal(err)
 	}
 }

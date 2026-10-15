@@ -30,6 +30,7 @@ func planRed(doc Document, pkgs []validate.Package, host discover.Host, policy P
 			step([]string{gitBin, "-C", target, "checkout", "--quiet", "--detach", "FETCH_HEAD"}, envDir, env, nil),
 		)
 	}
+	doc.RequiredFiles = []string{"sources/0"}
 	doc.Files = []FileDoc{{Path: "<per-run-shim>", Body: redShim(policy.Script)}}
 	doc.Execution.Argv = append([]string{host.Runtime.Path, "<per-run-shim>"}, policy.ScriptArgs...)
 	doc.Execution.Environment = managed(envDir, nil)

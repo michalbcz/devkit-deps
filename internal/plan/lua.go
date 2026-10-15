@@ -42,6 +42,7 @@ func planLua(doc Document, pkgs []validate.Package, host discover.Host, policy P
 		step(append(append([]string{}, common...), "path", "--lr-path"), envDir, nil, []string{"LUA_PATH", "LUA_PATH_" + suffix}),
 		step(append(append([]string{}, common...), "path", "--lr-cpath"), envDir, nil, []string{"LUA_CPATH", "LUA_CPATH_" + suffix}),
 	)
+	doc.RequiredFiles = []string{"lua"}
 	doc.Execution.Argv = append([]string{host.Runtime.Path, policy.Script}, policy.ScriptArgs...)
 	doc.Execution.Environment = managed(envDir, nil)
 	doc.Execution.DeferredEnvironment = []string{"LUA_PATH", "LUA_CPATH", "LUA_PATH_" + suffix, "LUA_CPATH_" + suffix}

@@ -43,6 +43,7 @@ func planPerl(doc Document, pkgs []validate.Package, host discover.Host, policy 
 		argv = append(argv, pkg.Spec)
 	}
 	doc.Setup = []StepDoc{step(argv, envDir, setupEnv, nil)}
+	doc.RequiredFiles = []string{"perl/lib/perl5"}
 	doc.Execution.Argv = append([]string{host.Runtime.Path, "-I" + lib, policy.Script}, policy.ScriptArgs...)
 	doc.Execution.Environment = managed(envDir, map[string]string{"PERL5LIB": lib})
 	return doc, nil

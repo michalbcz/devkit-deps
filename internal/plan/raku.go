@@ -39,6 +39,7 @@ func planRaku(doc Document, pkgs []validate.Package, host discover.Host, policy 
 	}
 	setupEnv := map[string]string{"PATH": pathPrepend(host.Runtime.Path)}
 	doc.Setup = []StepDoc{step(argv, envDir, setupEnv, nil)}
+	doc.RequiredFiles = []string{"raku"}
 	doc.Execution.Argv = append([]string{host.Runtime.Path, "-I" + target, policy.Script}, policy.ScriptArgs...)
 	doc.Execution.Environment = managed(envDir, map[string]string{"RAKULIB": target})
 	return doc, nil
