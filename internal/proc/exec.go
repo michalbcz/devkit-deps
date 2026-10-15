@@ -6,12 +6,79 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 
 	"devkit-deps/internal/diag"
 	"devkit-deps/internal/plan"
 )
+
+const (
+	perRunBinary = "<per-run-binary>"
+	perRunShim   = "<per-run-shim>"
+)
+
+func Activate(ctx context.Context, doc plan.Document, timeout time.Duration, stderr io.Writer) (plan.Document, func(), *diag.Diagnostic) {
+	var temps []string
+	cleanup := func() {
+		for _, path := range temps {
+			_ = os.Remove(path)
+		}
+	}
+	if len(doc.Execution.PreRun) > 0 {
+		bin, err := os.CreateTemp("", "devkit-deps-bin-*")
+		if err != nil {
+			return doc, nil, launchFailed(err.Error())
+		}
+		_ = bin.Close()
+		temps = append(temps, bin.Name())
+		steps := make([]plan.StepDoc, len(doc.Execution.PreRun))
+		copy(steps, doc.Execution.PreRun)
+		for i := range steps {
+			steps[i].Argv = substitute(steps[i].Argv, perRunBinary, bin.Name())
+		}
+		doc.Execution.Argv = substitute(doc.Execution.Argv, perRunBinary, bin.Name())
+		result := RunSetup(ctx, steps, timeout, stderr)
+		if result.Err != nil {
+			cleanup()
+			return doc, nil, &diag.Diagnostic{
+				Code: "launch.build", Message: result.Err.Message, Phase: diag.PhaseLaunch, Exit: 4,
+			}
+		}
+	}
+	for _, file := range doc.Files {
+		if file.Path != perRunShim {
+			continue
+		}
+		shim, err := os.CreateTemp("", "devkit-deps-*.red")
+		if err != nil {
+			cleanup()
+			return doc, nil, launchFailed(err.Error())
+		}
+		if _, err := shim.WriteString(file.Body); err != nil {
+			_ = shim.Close()
+			cleanup()
+			return doc, nil, launchFailed(err.Error())
+		}
+		_ = shim.Close()
+		temps = append(temps, shim.Name())
+		doc.Execution.Argv = substitute(doc.Execution.Argv, perRunShim, shim.Name())
+	}
+	return doc, cleanup, nil
+}
+
+func substitute(argv []string, token, value string) []string {
+	out := make([]string, len(argv))
+	for i, arg := range argv {
+		if arg == token {
+			out[i] = value
+		} else {
+			out[i] = strings.ReplaceAll(arg, token, value)
+		}
+	}
+	return out
+}
 
 func Launch(ctx context.Context, doc plan.Document, stdin io.Reader, stdout, stderr io.Writer, timeout time.Duration) (int, *diag.Diagnostic) {
 	if len(doc.Execution.Argv) == 0 {

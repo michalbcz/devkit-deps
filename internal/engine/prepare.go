@@ -17,6 +17,58 @@ import (
 	"devkit-deps/internal/proc"
 )
 
+type Options struct {
+	Rebuild       bool
+	NoPrepare     bool
+	SetupTimeout  time.Duration
+	ScriptTimeout time.Duration
+	Stdin         io.Reader
+	Stdout        io.Writer
+	Stderr        io.Writer
+	SkipLaunch    bool
+}
+
+func Run(ctx context.Context, doc plan.Document, opt Options) (int, *diag.Diagnostic) {
+	_, code, d := RunPrepared(ctx, doc, opt)
+	return code, d
+}
+
+func RunPrepared(ctx context.Context, doc plan.Document, opt Options) (plan.Document, int, *diag.Diagnostic) {
+	if opt.Stderr == nil {
+		opt.Stderr = io.Discard
+	}
+	var held *lease.Lease
+	if len(doc.Setup) > 0 {
+		var err error
+		held, err = lease.AcquireUse(ctx, doc.EnvironmentDirectory)
+		if err != nil {
+			d := asDiag(err)
+			return doc, d.Exit, d
+		}
+		defer held.Release()
+		var d *diag.Diagnostic
+		doc, d = Prepare(ctx, doc, held, opt.Rebuild, opt.NoPrepare, opt.SetupTimeout, opt.Stderr)
+		if d != nil {
+			return doc, d.Exit, d
+		}
+	}
+	doc, cleanup, d := proc.Activate(ctx, doc, opt.SetupTimeout, opt.Stderr)
+	if cleanup != nil {
+		defer cleanup()
+	}
+	if d != nil {
+		return doc, d.Exit, d
+	}
+	if opt.SkipLaunch {
+		return doc, 0, nil
+	}
+	code, d := proc.Launch(ctx, doc, opt.Stdin, opt.Stdout, opt.Stderr, opt.ScriptTimeout)
+	if d != nil {
+		return doc, d.Exit, d
+	}
+	return doc, code, nil
+}
+
 func Prepare(ctx context.Context, doc plan.Document, held *lease.Lease, rebuild, noPrepare bool, timeout time.Duration, stderr io.Writer) (plan.Document, *diag.Diagnostic) {
 	if len(doc.Setup) == 0 {
 		return doc, nil
