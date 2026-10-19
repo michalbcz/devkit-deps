@@ -67,7 +67,7 @@ Most items are `name@version`. Janet uses `git::https://host/repo.git::revision`
 
 ## Tools
 
-This tool does not install language runtimes, package managers, or operating-system packages.
+`run` does not install language runtimes or operating-system packages. `./devkit-deps install` does that when Homebrew can, and otherwise prints the command.
 
 | Language | Tools |
 |---|---|
@@ -87,7 +87,7 @@ This tool does not install language runtimes, package managers, or operating-sys
 | factor | `factor`, plus `git` when the script declares dependencies |
 | nasm | `nasm` and `cc`, plus `git` when the script declares dependencies |
 
-Node installs with `npm` and exposes packages through `NODE_PATH`, so scripts use `require()`. R installs with `pak::pkg_install`. This tool does not install `pak`. Tcl and Mojo use the Pixi-provided interpreters, not a host `tclsh` or `mojo`. Pixi environments are prepared for macOS and Linux on arm64 and amd64.
+Node installs with `npm` and exposes packages through `NODE_PATH`, so scripts use `require()`. R installs with `pak::pkg_install`. `./devkit-deps install --lang r` installs `pak` when `Rscript` is already on PATH. `run` does not. Tcl and Mojo use the Pixi-provided interpreters, not a host `tclsh` or `mojo`. Pixi environments are prepared for macOS and Linux on arm64 and amd64.
 
 Odin checks each dependency out under `collections/<name>` and builds with `odin build -file -collection:deps=<that directory>`. Import it as `deps:<name>`. Forth writes a prelude that runs `s" <dir>" fpath also-path`. It does not replace `GFORTHPATH`. Arguments after the script are Gforth OS arguments, read with `next-arg`. End the script with `bye`. The Gforth sample starts with `#! /usr/bin/env gforth`, including the space, because that is the form Gforth ignores. Factor passes each checkout to `-roots` and starts with `-no-user-init`. Put the `!` declaration above `USING:`. NASM is x86-64 only. `.asm` means NASM, not the GNU assembler. macOS assembles `macho64` and links with `cc -arch x86_64`, so Apple silicon needs Rosetta. `linux/amd64` assembles `elf64`. Other systems are rejected.
 
@@ -98,9 +98,12 @@ devkit-deps run [flags] <script> [-- <script args...>]
 devkit-deps prepare [flags] <script>
 devkit-deps plan [flags] <script>
 devkit-deps doctor [flags]
+devkit-deps install [--lang <id>]
 ```
 
-`run` prepares when needed, then runs the script. `prepare` stops after the environment is ready. `plan` prints the plan and does not install or run anything. `doctor` reports whether each runtime is usable. `doctor` with no `--lang` exits 0 even when some tools are missing. `doctor --lang` exits 3 when that language's runtime or manager is missing or incompatible.
+`run` prepares when needed, then runs the script. `prepare` stops after the environment is ready. `plan` prints the plan and does not install or run anything. `doctor` reports whether each runtime is usable. `doctor` with no `--lang` exits 0 even when some tools are missing. `doctor --lang` exits 3 when that language's runtime or manager is missing or incompatible. Both print how to install a missing tool.
+
+`./devkit-deps install` installs missing tools with Homebrew when `brew` is on PATH and a formula, or the Factor cask, exists. Otherwise it prints the command or the download page. `./devkit-deps install --lang forth` limits that to one language. A failed `run` prints the same direction and does not start the installer. Factor's cask is an Intel build in `/Applications/factor`, so add that directory to `PATH`. Apple silicon also needs Rosetta.
 
 | Flag | Meaning |
 |---|---|
@@ -116,7 +119,7 @@ devkit-deps doctor [flags]
 | `--timeout` | Script deadline. Omitted means no deadline. `0` is rejected |
 | `--json` | Machine-readable output for `plan` and `prepare` |
 
-The tool looks for a matching binary already on the machine. It does not install one, and it does not search for a newer install. `--runtime` and `--runtime-version` are rejected for Tcl and Mojo, because those runtimes come from Pixi. `--runtime` and `--manager` must be absolute paths.
+The tool looks for a matching binary already on the machine. `run`, `plan`, `prepare`, and `doctor` do not install one, and they do not search for a newer install. `--runtime` and `--runtime-version` are rejected for Tcl and Mojo, because those runtimes come from Pixi. `--runtime` and `--manager` must be absolute paths.
 
 | Code | Meaning |
 |---|---|

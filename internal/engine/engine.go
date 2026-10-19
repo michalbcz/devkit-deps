@@ -12,9 +12,12 @@ import (
 	"syscall"
 	"time"
 
+	"strings"
+
 	"devkit-deps/internal/cache"
 	"devkit-deps/internal/diag"
 	"devkit-deps/internal/discover"
+	"devkit-deps/internal/install"
 	"devkit-deps/internal/lang"
 	"devkit-deps/internal/parse"
 	"devkit-deps/internal/plan"
@@ -42,6 +45,7 @@ type Request struct {
 	Stdout            io.Writer
 	Stderr            io.Writer
 	Look              discover.Looker
+	Runner            install.Runner
 }
 
 func Execute(ctx context.Context, req Request) int {
@@ -74,6 +78,9 @@ func Execute(ctx context.Context, req Request) int {
 
 	if req.Command == "doctor" {
 		return doctor(req)
+	}
+	if req.Command == "install" {
+		return installTools(ctx, req)
 	}
 	if req.Script == "" {
 		return report(req, &diag.Diagnostic{Code: "cli.script", Message: "a script path is required", Phase: diag.PhaseCLI, Exit: 2})
@@ -160,12 +167,17 @@ func Execute(ctx context.Context, req Request) int {
 	return code
 }
 
+func languageIDs() []lang.ID {
+	return []lang.ID{lang.Perl, lang.PHP, lang.Raku, lang.Janet, lang.Lua, lang.GoLang, lang.PowerShell, lang.Tcl, lang.Mojo, lang.Shell, lang.Red, lang.Node, lang.R, lang.Odin, lang.Forth, lang.Factor, lang.NASM}
+}
+
 func doctor(req Request) int {
-	ids := []lang.ID{lang.Perl, lang.PHP, lang.Raku, lang.Janet, lang.Lua, lang.GoLang, lang.PowerShell, lang.Tcl, lang.Mojo, lang.Shell, lang.Red, lang.Node, lang.R, lang.Odin, lang.Forth, lang.Factor, lang.NASM}
+	ids := languageIDs()
 	if req.Lang != "" {
 		ids = []lang.ID{lang.ID(req.Lang)}
 	}
 	platform := cache.Platform{GOOS: runtime.GOOS, GOARCH: runtime.GOARCH}
+	brew := install.BrewOnPath(req.Look)
 	for _, id := range ids {
 		dialect := lang.Dialect("")
 		if id == lang.Shell {
@@ -202,17 +214,100 @@ func doctor(req Request) int {
 		}
 		if len(host.MissingTools) > 0 || host.Runtime.Status == "missing" || host.Runtime.Status == "incompatible" {
 			name := host.Runtime.Name
-			if len(host.MissingTools) > 0 {
-				name = host.MissingTools[0]
+			tools := append([]string{}, host.MissingTools...)
+			if len(tools) == 0 {
+				if name == "" {
+					name = string(id)
+				}
+				tools = []string{name}
 			}
-			fmt.Fprintf(req.Stdout, "%s\tmissing\t%s\n", id, name)
+			name = tools[0]
+			hint := install.Direct(name, install.Options{Brew: brew, GOOS: runtime.GOOS}).FirstLine()
+			fmt.Fprintf(req.Stdout, "%s\tmissing\t%s\t%s\n", id, name, hint)
 			if req.Lang != "" {
-				fmt.Fprintln(req.Stderr, "missing "+name)
+				fmt.Fprintln(req.Stderr, install.Missing(tools, install.Options{Brew: brew, GOOS: runtime.GOOS}))
 				return 3
 			}
 			continue
 		}
 		fmt.Fprintf(req.Stdout, "%s\tok\t%s\t%s\n", id, host.Runtime.Path, host.Runtime.Version)
+	}
+	return 0
+}
+
+func installTools(ctx context.Context, req Request) int {
+	ids := languageIDs()
+	if req.Lang != "" {
+		ids = []lang.ID{lang.ID(req.Lang)}
+	}
+	platform := cache.Platform{GOOS: runtime.GOOS, GOARCH: runtime.GOARCH}
+	brew := install.BrewOnPath(req.Look)
+	runner := req.Runner
+	if runner == nil {
+		runner = install.ExecRunner{}
+	}
+	opt := install.Options{Brew: brew, Auto: true, GOOS: runtime.GOOS}
+	failed := false
+	seen := map[string]bool{}
+	for _, id := range ids {
+		dialect := lang.Dialect("")
+		if id == lang.Shell {
+			dialect = lang.Bash
+		}
+		if id == lang.Tcl || id == lang.Mojo || id == lang.Shell {
+			if _, d := cache.PixiTarget(platform); d != nil {
+				fmt.Fprintf(req.Stdout, "%s\tunsupported\t%s\n", id, d.Message)
+				fmt.Fprintln(req.Stderr, d.Message)
+				failed = true
+				continue
+			}
+		}
+		host, d := discover.Discover(id, dialect, "", "", "", platform, req.Look)
+		if d != nil {
+			fmt.Fprintf(req.Stdout, "%s\t%s\t%s\n", id, d.Code, d.Message)
+			fmt.Fprintln(req.Stderr, d.Message)
+			failed = true
+			continue
+		}
+		tools := append([]string{}, host.MissingTools...)
+		rscript := ""
+		if id == lang.R {
+			if host.Runtime.Status == "ok" && host.Runtime.Path != "" {
+				rscript = host.Runtime.Path
+				if err := runner.Run(ctx, install.PakProbeArgv(rscript), io.Discard, io.Discard); err != nil {
+					tools = append(tools, "pak")
+				}
+			} else {
+				tools = append(tools, "pak")
+			}
+		}
+		if len(tools) == 0 {
+			fmt.Fprintf(req.Stdout, "%s\tok\t%s\t%s\n", id, host.Runtime.Path, host.Runtime.Version)
+			continue
+		}
+		local := opt
+		local.Rscript = rscript
+		for _, tool := range tools {
+			step := install.Direct(tool, local)
+			fmt.Fprintf(req.Stdout, "%s\tmissing\t%s\n%s\n", id, tool, step.Text)
+			if len(step.Argv) == 0 {
+				failed = true
+				continue
+			}
+			key := strings.Join(step.Argv, "\x00")
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			fmt.Fprintf(req.Stdout, "$ %s\n", strings.Join(step.Argv, " "))
+			if err := runner.Run(ctx, step.Argv, req.Stdout, req.Stderr); err != nil {
+				fmt.Fprintf(req.Stderr, "%s: %v\n", tool, err)
+				failed = true
+			}
+		}
+	}
+	if failed {
+		return 3
 	}
 	return 0
 }

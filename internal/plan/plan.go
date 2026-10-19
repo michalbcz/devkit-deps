@@ -3,11 +3,13 @@ package plan
 import (
 	"encoding/json"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"devkit-deps/internal/cache"
 	"devkit-deps/internal/diag"
 	"devkit-deps/internal/discover"
+	"devkit-deps/internal/install"
 	"devkit-deps/internal/lang"
 	"devkit-deps/internal/parse"
 	"devkit-deps/internal/validate"
@@ -77,7 +79,7 @@ func Build(decl parse.Declaration, pkgs []validate.Package, host discover.Host, 
 		doc.Setup = []StepDoc{}
 		doc.Execution.Argv = []string{}
 		doc.Execution.PreRun = []StepDoc{}
-		return normalize(doc), missingRuntime(host)
+		return normalize(doc), missingRuntime(host, policy.Look)
 	}
 	if len(pkgs) == 0 && host.Language != lang.Tcl && host.Language != lang.Mojo {
 		doc, d := noDeps(doc, host, policy)
@@ -87,11 +89,7 @@ func Build(decl parse.Declaration, pkgs []validate.Package, host discover.Host, 
 		if host.Language == lang.NASM && containsTool(doc.MissingTools, "cc") {
 			doc.Setup = []StepDoc{}
 			doc.Execution.PreRun = []StepDoc{}
-			return normalize(doc), &diag.Diagnostic{
-				Code: "tool.missing", Message: "missing " + strings.Join(doc.MissingTools, ", "),
-				Language: string(host.Language), Phase: diag.PhaseDiscover,
-				MissingTools: append([]string{}, doc.MissingTools...), Exit: 3,
-			}
+			return normalize(doc), missingTools(string(host.Language), doc.MissingTools, policy.Look)
 		}
 		return normalize(doc), nil
 	}
@@ -109,11 +107,7 @@ func Build(decl parse.Declaration, pkgs []validate.Package, host discover.Host, 
 	if len(planned.MissingTools) > 0 {
 		planned.Setup = []StepDoc{}
 		planned.Execution.PreRun = []StepDoc{}
-		return normalize(planned), &diag.Diagnostic{
-			Code: "tool.missing", Message: "missing " + strings.Join(planned.MissingTools, ", "),
-			Language: string(host.Language), Phase: diag.PhaseDiscover,
-			MissingTools: append([]string{}, planned.MissingTools...), Exit: 3,
-		}
+		return normalize(planned), missingTools(string(host.Language), planned.MissingTools, policy.Look)
 	}
 	return normalize(planned), nil
 }
@@ -232,7 +226,7 @@ func redEscape(path string) string {
 	return b.String()
 }
 
-func missingRuntime(host discover.Host) *diag.Diagnostic {
+func missingRuntime(host discover.Host, look discover.Looker) *diag.Diagnostic {
 	name := host.Runtime.Name
 	if name == "" {
 		name = string(host.Language)
@@ -249,10 +243,26 @@ func missingRuntime(host discover.Host) *diag.Diagnostic {
 	if len(tools) == 0 {
 		tools = []string{name}
 	}
+	if host.Runtime.Status == "incompatible" {
+		return &diag.Diagnostic{
+			Code: code, Message: "missing " + strings.Join(tools, ", "),
+			Language: string(host.Language), Phase: diag.PhaseDiscover,
+			MissingTools: tools, Exit: 3,
+		}
+	}
+	d := missingTools(string(host.Language), tools, look)
+	d.Code = code
+	return d
+}
+
+func missingTools(language string, tools []string, look discover.Looker) *diag.Diagnostic {
 	return &diag.Diagnostic{
-		Code: code, Message: "missing " + strings.Join(tools, ", "),
-		Language: string(host.Language), Phase: diag.PhaseDiscover,
-		MissingTools: tools, Exit: 3,
+		Code: "tool.missing",
+		Message: install.Missing(tools, install.Options{
+			Brew: install.BrewOnPath(look), GOOS: runtime.GOOS,
+		}),
+		Language: language, Phase: diag.PhaseDiscover,
+		MissingTools: append([]string{}, tools...), Exit: 3,
 	}
 }
 

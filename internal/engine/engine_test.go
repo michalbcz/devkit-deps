@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"devkit-deps/internal/discover"
 	"devkit-deps/internal/engine"
+	"devkit-deps/internal/install"
 )
 
 func TestPlanDoesNotRunInstaller(t *testing.T) {
@@ -121,3 +124,118 @@ func TestMissingRuntimeDoesNotStartOrCache(t *testing.T) {
 		t.Fatal("run created a cache directory")
 	}
 }
+
+func TestInstallRunsBrewAndPlanOnlyPrintsIt(t *testing.T) {
+	var ran [][]string
+	look := discover.LookerFunc(func(name string) (string, time.Time, bool) {
+		switch name {
+		case "brew":
+			return "/opt/homebrew/bin/brew", time.Unix(1, 0), true
+		case "git":
+			return "/usr/bin/git", time.Unix(1, 0), true
+		default:
+			return "", time.Time{}, false
+		}
+	})
+	runner := install.RunnerFunc(func(_ context.Context, argv []string, _, _ io.Writer) error {
+		ran = append(ran, append([]string{}, argv...))
+		return nil
+	})
+	var stdout, stderr bytes.Buffer
+	code := engine.Execute(context.Background(), engine.Request{
+		Command: "install", Lang: "odin", Look: look, Runner: runner,
+		Stdout: &stdout, Stderr: &stderr,
+	})
+	if code != 0 || len(ran) != 1 || strings.Join(ran[0], " ") != "brew install odin" {
+		t.Fatalf("install %d %#v\n%s\n%s", code, ran, stdout.String(), stderr.String())
+	}
+
+	ran = nil
+	stdout.Reset()
+	stderr.Reset()
+	dir := t.TempDir()
+	script := filepath.Join(dir, "a.odin")
+	if err := os.WriteFile(script, []byte("package main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code = engine.Execute(context.Background(), engine.Request{
+		Command: "plan", Lang: "odin", Script: script, Look: look, Runner: runner,
+		CacheDir: filepath.Join(dir, "cache"), Stdout: &stdout, Stderr: &stderr,
+	})
+	if code != 3 || len(ran) != 0 || !strings.Contains(stderr.String(), "brew install odin") {
+		t.Fatalf("plan %d %#v %s", code, ran, stderr.String())
+	}
+}
+
+func TestInstallRunsNodeOnceAndPrintsPak(t *testing.T) {
+	var ran [][]string
+	look := discover.LookerFunc(func(name string) (string, time.Time, bool) {
+		if name == "brew" {
+			return "/opt/homebrew/bin/brew", time.Unix(1, 0), true
+		}
+		return "", time.Time{}, false
+	})
+	runner := install.RunnerFunc(func(_ context.Context, argv []string, _, _ io.Writer) error {
+		ran = append(ran, append([]string{}, argv...))
+		if len(argv) > 2 && argv[2] == "-e" && strings.Contains(argv[3], "requireNamespace") {
+			return errExit(1)
+		}
+		return nil
+	})
+	var stdout, stderr bytes.Buffer
+	code := engine.Execute(context.Background(), engine.Request{
+		Command: "install", Lang: "node", Look: look, Runner: runner,
+		Stdout: &stdout, Stderr: &stderr,
+	})
+	if code != 0 || len(ran) != 1 || strings.Join(ran[0], " ") != "brew install node" {
+		t.Fatalf("node %d %#v\n%s", code, ran, stdout.String())
+	}
+
+	ran = nil
+	stdout.Reset()
+	stderr.Reset()
+	code = engine.Execute(context.Background(), engine.Request{
+		Command: "install", Lang: "r", Look: look, Runner: runner,
+		Stdout: &stdout, Stderr: &stderr,
+	})
+	if code != 3 || len(ran) != 1 || strings.Join(ran[0], " ") != "brew install r" {
+		t.Fatalf("r %d %#v\n%s\n%s", code, ran, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "install.packages") {
+		t.Fatalf("%s", stdout.String())
+	}
+}
+
+func TestInstallPakWhenRscriptExists(t *testing.T) {
+	var ran [][]string
+	rscript := "/tools/Rscript"
+	look := discover.LookerFunc(func(name string) (string, time.Time, bool) {
+		if name == "Rscript" {
+			return rscript, time.Unix(1, 0), true
+		}
+		return "", time.Time{}, false
+	})
+	runner := install.RunnerFunc(func(_ context.Context, argv []string, _, _ io.Writer) error {
+		ran = append(ran, append([]string{}, argv...))
+		if strings.Contains(strings.Join(argv, " "), "requireNamespace") {
+			return errExit(1)
+		}
+		return nil
+	})
+	var stdout, stderr bytes.Buffer
+	code := engine.Execute(context.Background(), engine.Request{
+		Command: "install", Lang: "r", Look: look, Runner: runner,
+		Stdout: &stdout, Stderr: &stderr,
+	})
+	if code != 0 || len(ran) != 2 {
+		t.Fatalf("%d %#v\n%s\n%s", code, ran, stdout.String(), stderr.String())
+	}
+	if ran[1][0] != rscript || !strings.Contains(ran[1][3], "r-lib.github.io/p/pak/stable") {
+		t.Fatalf("%#v", ran)
+	}
+}
+
+type errExit int
+
+func (e errExit) Error() string { return "exit" }
+func (e errExit) ExitCode() int { return int(e) }
