@@ -24,6 +24,10 @@ const (
 	Red        ID = "red"
 	Node       ID = "node"
 	R          ID = "r"
+	Odin       ID = "odin"
+	Forth      ID = "forth"
+	Factor     ID = "factor"
+	NASM       ID = "nasm"
 )
 
 type Dialect string
@@ -52,6 +56,7 @@ var extensions = map[string]ID{
 	".tcl": Tcl, ".mojo": Mojo, ".sh": Shell, ".bash": Shell, ".zsh": Shell,
 	".red": Red,
 	".js":  Node, ".mjs": Node, ".cjs": Node, ".r": R,
+	".odin": Odin, ".fs": Forth, ".factor": Factor, ".asm": NASM,
 }
 
 var plainInterpreters = map[string]ID{
@@ -63,16 +68,21 @@ var plainInterpreters = map[string]ID{
 	"red":  Red,
 	"node": Node, "nodejs": Node,
 	"Rscript": R,
+	"odin":    Odin, "gforth": Forth, "factor": Factor, "nasm": NASM,
 }
 
 func CommentPrefix(id ID) (string, error) {
 	switch id {
-	case PHP, GoLang, Node:
+	case PHP, GoLang, Node, Odin:
 		return "//", nil
 	case Lua:
 		return "--", nil
-	case Red:
+	case Red, NASM:
 		return ";", nil
+	case Forth:
+		return "\\", nil
+	case Factor:
+		return "!", nil
 	case Perl, Raku, Janet, PowerShell, Tcl, Mojo, Shell, R:
 		return "#", nil
 	default:

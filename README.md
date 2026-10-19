@@ -40,7 +40,7 @@ A single number is only the major version, the same idea as `python3`. Put it on
 
 `--runtime-version 5` matches Lua 5.4.2 and does not match Lua 4.
 
-Raku, Janet, PowerShell, Red, and R have no version in the program name, so use that flag. Bash and zsh report a version, so the flag works for them. On Debian and Ubuntu, `sh` is dash. `sh --version` exits with `Illegal option`, and a version pin for that shell is rejected.
+Raku, Janet, PowerShell, Red, R, Forth, Factor, and NASM have no version in the program name, so use that flag. Odin prints a date such as `dev-2025-01`, which is not a dotted version, so `--runtime-version` does not select it. Bash and zsh report a version, so the flag works for them. On Debian and Ubuntu, `sh` is dash. `sh --version` exits with `Illegal option`, and a version pin for that shell is rejected.
 
 Go understands `go1.22`, but `go build` cannot compile a `#!` line, so pin Go on the command line:
 
@@ -52,14 +52,16 @@ Tcl and Mojo take their runtime from Pixi. A host version in those scripts is no
 
 ## Packages
 
-Most items are `name@version`. Janet uses `git::https://host/repo.git::revision`. Red uses `https://host/repo.git#` and a 40-character commit. A Mojo PyPI package starts with `pypi:`.
+Most items are `name@version`. Janet uses `git::https://host/repo.git::revision`. Red, Forth, Factor, and NASM use `https://host/repo.git#` and a 40-character commit. Odin uses `name=https://host/repo.git#` and that same commit. The name is the package directory. A Mojo PyPI package starts with `pypi:`.
 
 | Languages | Comment mark |
 |---|---|
 | Perl, Raku, Janet, PowerShell, Tcl, Mojo, shell, R | `#` |
-| PHP, Go, Node | `//` |
+| PHP, Go, Node, Odin | `//` |
 | Lua | `--` |
-| Red | `;` |
+| Forth | `\` |
+| Factor | `!` |
+| Red, NASM | `;` |
 
 [samples/go.mod](samples/go.mod) keeps `hello.go` out of this module. `devkit-deps run` still builds that file in its own environment. The tests read the files in `samples/`.
 
@@ -80,8 +82,14 @@ This tool does not install language runtimes, package managers, or operating-sys
 | red | `red`, plus `git` when the script declares dependencies |
 | node | `node`, `npm` |
 | r | `Rscript`, and the `pak` package already installed for that R |
+| odin | `odin`, plus `git` when the script declares dependencies |
+| forth | `gforth`, plus `git` when the script declares dependencies |
+| factor | `factor`, plus `git` when the script declares dependencies |
+| nasm | `nasm` and `cc`, plus `git` when the script declares dependencies |
 
 Node installs with `npm` and exposes packages through `NODE_PATH`, so scripts use `require()`. R installs with `pak::pkg_install`. This tool does not install `pak`. Tcl and Mojo use the Pixi-provided interpreters, not a host `tclsh` or `mojo`. Pixi environments are prepared for macOS and Linux on arm64 and amd64.
+
+Odin checks each dependency out under `collections/<name>` and builds with `odin build -file -collection:deps=<that directory>`. Import it as `deps:<name>`. Forth writes a prelude that runs `s" <dir>" fpath also-path`. It does not replace `GFORTHPATH`. Arguments after the script are Gforth OS arguments, read with `next-arg`. End the script with `bye`. The Gforth sample starts with `#! /usr/bin/env gforth`, including the space, because that is the form Gforth ignores. Factor passes each checkout to `-roots` and starts with `-no-user-init`. Put the `!` declaration above `USING:`. NASM is x86-64 only. `.asm` means NASM, not the GNU assembler. macOS assembles `macho64` and links with `cc -arch x86_64`, so Apple silicon needs Rosetta. `linux/amd64` assembles `elf64`. Other systems are rejected.
 
 ## Commands
 
@@ -128,6 +136,8 @@ A manager lockfile kept beside an environment is not a universal lock, and `--no
 
 ## Other languages
 
+These already have a package tool. This wrapper does not implement them.
+
 | Language | Declaration |
 |---|---|
 | C# | [`#:package`](https://learn.microsoft.com/en-us/dotnet/core/sdk/file-based-apps#package) in a file-based app |
@@ -139,6 +149,17 @@ A manager lockfile kept beside an environment is not a universal lock, and `--no
 | Elixir | [`Mix.install/2`](https://hexdocs.pm/mix/Mix.html#install/2) |
 | Scala | [Scala CLI `//> using dep`](https://scala-cli.virtuslab.org/docs/guides/introduction/using-directives) |
 | Rust | [Cargo single-file packages](https://doc.rust-lang.org/cargo/reference/unstable.html#script) |
+| Julia | [`Pkg.activate(; temp=true)`](https://pkgdocs.julialang.org/dev/api/) and `Pkg.add` |
+| D | [DUB single-file `dub.sdl`](https://dub.pm/dub-guide/single) |
+| Swift | [`Package.swift`](https://docs.swift.org/latest/documentation/packagemanagerdocs/addingdependencies) |
+| Objective-C | Swift Package Manager, or [CocoaPods](https://guides.cocoapods.org/using/using-cocoapods.html) |
+| C, C++ | [Conan](https://docs.conan.io/), [vcpkg](https://vcpkg.io/), [build2](https://build2.org/), [clib](https://github.com/clibs/clib). There is no single script syntax |
+| Nim | [Nimble](https://nim-lang.github.io/nimble/), [Atlas](https://nim-lang.github.io/Nim/atlas.html) |
+| Zig | [`build.zig.zon`](https://ziglang.org/learn/build-system/) |
+| Erlang | [rebar3 dependencies](https://rebar3.org/docs/configuration/dependencies/) |
+| Gleam | [`gleam.toml`](https://gleam.run/writing-gleam/gleam-toml/) |
+| Free Pascal | [`fppkg`](https://wiki.freepascal.org/fppkg) |
+| Lazarus | [Online Package Manager](https://wiki.lazarus.freepascal.org/Online_Package_Manager) |
 
 The upstream commit and license are in [NOTICE](NOTICE). The full contract is in [SPEC.md](SPEC.md).
 

@@ -80,7 +80,20 @@ func Build(decl parse.Declaration, pkgs []validate.Package, host discover.Host, 
 		return normalize(doc), missingRuntime(host)
 	}
 	if len(pkgs) == 0 && host.Language != lang.Tcl && host.Language != lang.Mojo {
-		return normalize(noDeps(doc, host, policy)), nil
+		doc, d := noDeps(doc, host, policy)
+		if d != nil {
+			return normalize(doc), d
+		}
+		if host.Language == lang.NASM && containsTool(doc.MissingTools, "cc") {
+			doc.Setup = []StepDoc{}
+			doc.Execution.PreRun = []StepDoc{}
+			return normalize(doc), &diag.Diagnostic{
+				Code: "tool.missing", Message: "missing " + strings.Join(doc.MissingTools, ", "),
+				Language: string(host.Language), Phase: diag.PhaseDiscover,
+				MissingTools: append([]string{}, doc.MissingTools...), Exit: 3,
+			}
+		}
+		return normalize(doc), nil
 	}
 	fn := planners[host.Language]
 	if fn == nil {
@@ -162,7 +175,7 @@ func skeleton(decl parse.Declaration, pkgs []validate.Package, host discover.Hos
 	}
 }
 
-func noDeps(doc Document, host discover.Host, policy Policy) Document {
+func noDeps(doc Document, host discover.Host, policy Policy) (Document, *diag.Diagnostic) {
 	switch host.Language {
 	case lang.GoLang:
 		env := map[string]string{
@@ -183,10 +196,20 @@ func noDeps(doc Document, host discover.Host, policy Policy) Document {
 	case lang.R:
 		doc.Execution.Argv = append([]string{host.Runtime.Path, "--vanilla", policy.Script}, policy.ScriptArgs...)
 		doc.Execution.Environment = map[string]string{}
+	case lang.Odin:
+		doc = odinBuild(doc, host, policy, "", map[string]string{})
+	case lang.Forth:
+		doc.Execution.Argv = append([]string{host.Runtime.Path, "--no-rc", policy.Script}, policy.ScriptArgs...)
+		doc.Execution.Environment = map[string]string{"GFORTH_ENV": "off"}
+	case lang.Factor:
+		doc.Execution.Argv = append([]string{host.Runtime.Path, "-no-user-init", policy.Script}, policy.ScriptArgs...)
+		doc.Execution.Environment = map[string]string{}
+	case lang.NASM:
+		return assembleNASM(doc, nil, host, policy)
 	default:
 		doc.Execution.Environment = map[string]string{}
 	}
-	return doc
+	return doc, nil
 }
 
 func redShim(script string) string {

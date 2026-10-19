@@ -145,6 +145,11 @@ func Discover(id lang.ID, dialect lang.Dialect, runtimeFlag, runtimeVersion, man
 		host.Manager = Tool{Name: managerName, Status: "missing"}
 		host.MissingTools = append(host.MissingTools, managerName)
 	}
+	if id == lang.NASM {
+		if _, _, ok := look.Look("cc"); !ok {
+			host.MissingTools = append(host.MissingTools, "cc")
+		}
+	}
 	if id == lang.Raku && host.Manager.Path != "" {
 		script, includes, zerr := ZefLaunch(host.Manager.Path)
 		if zerr == nil {
@@ -168,6 +173,8 @@ func conventionalRuntime(id lang.ID, dialect lang.Dialect) string {
 		return "pwsh"
 	case lang.R:
 		return "Rscript"
+	case lang.Forth:
+		return "gforth"
 	default:
 		return string(id)
 	}
@@ -193,7 +200,7 @@ func managerBinary(id lang.ID) string {
 		return "npm"
 	case lang.Shell:
 		return "pixi"
-	case lang.Red:
+	case lang.Red, lang.Odin, lang.Forth, lang.Factor, lang.NASM:
 		return "git"
 	default:
 		return string(id)
@@ -316,10 +323,12 @@ func finishProbe(id lang.ID, path string, mod time.Time, requested, name string)
 func probe(bin string, id lang.ID) string {
 	args := []string{"-v"}
 	switch id {
-	case lang.GoLang:
+	case lang.GoLang, lang.Odin:
 		args = []string{"version"}
-	case lang.Shell, lang.Node, lang.R:
+	case lang.Shell, lang.Node, lang.R, lang.Forth:
 		args = []string{"--version"}
+	case lang.Factor:
+		args = []string{"-e=USING: system ; vm-version print"}
 	case lang.PowerShell:
 		args = []string{"-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.ToString()"}
 	case lang.Red:

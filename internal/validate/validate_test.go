@@ -48,6 +48,10 @@ func TestAcceptedFixturePins(t *testing.T) {
 		{lang.Node, "left-pad@1.3.0"},
 		{lang.Node, "@sindresorhus/is@4.6.0"},
 		{lang.R, "praise@1.0.0"},
+		{lang.Odin, "http=https://github.com/laytan/odin-http.git#fac113fbd828aad3d71479a534b5de4358b6a07b"},
+		{lang.Forth, "https://github.com/forthy42/gforth.git#c9536461d750ea7b7ac8b738bf8763b839ecf1b9"},
+		{lang.Factor, "https://github.com/mrjbq7/re-factor.git#eb488704620c49a023d77cf78d2cbcb72b9f1a73"},
+		{lang.NASM, "https://github.com/netwide-assembler/nasm.git#fbdc88565ccccfa0e8c69b21b1953d1eded02e89"},
 	}
 	for _, tc := range cases {
 		pkgs, d := Validate(tc.id, []string{tc.spec})
@@ -72,12 +76,28 @@ func TestRejectedNames(t *testing.T) {
 		{lang.Node, "@scope@1.0.0", "package.spec"},
 		{lang.R, "1praise@1.0.0", "package.spec"},
 		{lang.R, "praise", "package.spec"},
+		{lang.Odin, "https://host/repo.git#0123456789abcdef0123456789abcdef01234567", "package.spec"},
+		{lang.Odin, "1http=https://host/repo.git#0123456789abcdef0123456789abcdef01234567", "package.spec"},
+		{lang.Forth, "https://host/repo.git#abc", "package.spec"},
+		{lang.NASM, "left-pad@1.0.0", "package.spec"},
 	}
 	for _, tc := range cases {
 		_, d := Validate(tc.id, []string{tc.spec})
 		if d == nil || d.Code != tc.code || d.Exit != 2 {
 			t.Fatalf("%s %s -> %+v", tc.id, tc.spec, d)
 		}
+	}
+}
+
+func TestOdinCollectionNameIsIdentity(t *testing.T) {
+	spec := "http=https://github.com/laytan/odin-http.git#fac113fbd828aad3d71479a534b5de4358b6a07b"
+	pkgs, d := Validate(lang.Odin, []string{spec})
+	if d != nil || pkgs[0].Identity != "http" || pkgs[0].Name != "https://github.com/laytan/odin-http.git" || pkgs[0].Version != "fac113fbd828aad3d71479a534b5de4358b6a07b" {
+		t.Fatalf("%+v %+v", pkgs, d)
+	}
+	_, d = Validate(lang.Odin, []string{spec, "http=https://github.com/other/http.git#0123456789abcdef0123456789abcdef01234567"})
+	if d == nil || d.Code != "package.conflict" {
+		t.Fatalf("%+v", d)
 	}
 }
 
