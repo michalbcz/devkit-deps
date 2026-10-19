@@ -2,12 +2,15 @@ package plan_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"devkit-deps/internal/cache"
+	"devkit-deps/internal/discover"
 	"devkit-deps/internal/lang"
 	"devkit-deps/internal/parse"
 	"devkit-deps/internal/plan"
@@ -172,8 +175,28 @@ func TestNASMWithoutCC(t *testing.T) {
 	host := fixedHost(lang.NASM, "/selected/nasm", "git")
 	_, d := plan.Build(parse.Declaration{Kind: parse.KindAbsent}, nil, host, plan.Policy{
 		Script: "/work/hello.asm", CallerCwd: "/caller",
+		Look: discover.LookerFunc(func(string) (string, time.Time, bool) {
+			return "", time.Time{}, false
+		}),
 	})
 	if d == nil || d.Code != "tool.missing" || d.Exit != 3 || !reflect.DeepEqual(d.MissingTools, []string{"cc"}) {
 		t.Fatalf("%+v", d)
+	}
+}
+
+func TestNASMNilLookUsesCCFromPATH(t *testing.T) {
+	cc, err := exec.LookPath("cc")
+	if err != nil {
+		t.Skip(err.Error())
+	}
+	host := fixedHost(lang.NASM, "/selected/nasm", "git")
+	doc, d := plan.Build(parse.Declaration{Kind: parse.KindAbsent}, nil, host, plan.Policy{
+		Script: "/work/hello.asm", CallerCwd: "/caller",
+	})
+	if d != nil {
+		t.Fatal(d)
+	}
+	if doc.Execution.PreRun[1].Argv[0] != cc {
+		t.Fatalf("linker %q, PATH has %q", doc.Execution.PreRun[1].Argv[0], cc)
 	}
 }

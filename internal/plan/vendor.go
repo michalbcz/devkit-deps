@@ -43,10 +43,12 @@ func removeTool(tools []string, name string) []string {
 }
 
 func lookupCC(policy Policy) (string, bool) {
-	if policy.Look != nil {
-		if path, _, ok := policy.Look.Look("cc"); ok && path != "" {
-			return path, false
-		}
+	look := policy.Look
+	if look == nil {
+		look = discover.PathLooker()
+	}
+	if path, _, ok := look.Look("cc"); ok && path != "" {
+		return path, false
 	}
 	return "", true
 }
