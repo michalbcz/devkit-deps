@@ -2,9 +2,22 @@
 
 `devkit-deps` is this wrapper's comment convention, not a language standard. An ordinary interpreter ignores the comment. Only this wrapper prepares the dependencies and runs the script.
 
+## Other languages
+
+These languages already name dependencies in the script:
+
+| Language | Declaration |
+|---|---|
+| C# | [`#:package`](https://learn.microsoft.com/en-us/dotnet/core/sdk/file-based-apps#package) in a file-based app |
+| Java | [JBang `//DEPS`](https://www.jbang.dev/documentation/jbang/latest/dependencies.html) |
+| F# | [`#r "nuget:"`](https://learn.microsoft.com/en-us/dotnet/fsharp/tools/fsharp-interactive/#referencing-packages-in-f-interactive) in an `.fsx` script |
+| Clojure | [Babashka `:deps`](https://book.babashka.org/#_paths_and_deps) in `bb.edn` |
+| Kotlin | [kscript `@file:DependsOn`](https://github.com/kscripting/kscript#declare-dependencies-with-filedependson) |
+| Groovy | [Grape `@Grab`](https://docs.groovy-lang.org/latest/html/documentation/grape.html#_add_a_dependency) |
+
 ## A script
 
-The comment lists packages. Most items are `name@version`. Janet uses `git::https://host/repo.git::revision`. Red uses `https://host/repo.git#` and a 40-character commit. A Mojo PyPI package starts with `pypi:`. A versioned program name on the first line asks for that runtime. `lua5.4` means Lua 5.4.
+The comment lists packages. Most items are `name@version`. Janet uses `git::https://host/repo.git::revision`. Red uses `https://host/repo.git#` and a 40-character commit. A Mojo PyPI package starts with `pypi:`. The first line can name the runtime version.
 
 ```lua
 #!/usr/bin/env lua5.4
@@ -19,9 +32,13 @@ go build -o devkit-deps ./cmd/devkit-deps
 ./devkit-deps run samples/hello.lua
 ```
 
-`5.4` matches Lua 5.4.2. It does not match 5.5. Lua must already be installed.
+`#!/usr/bin/env` takes one program name and nothing else. `lua5.4` is the language `lua` plus the version `5.4`. A direct path uses the file name the same way: `#!/usr/bin/lua5.4`. Flags and extra words are rejected, including `#!/usr/bin/env -S lua5.4`.
 
-The same first-line form works for Perl (`perl5.40`) and PHP (`php8.3`). `--runtime-version 5.4` asks for the same thing and wins over the first line. Raku, Janet, PowerShell, and Red have no version in the program name, so use that flag. Bash and zsh report a version, so the flag works for them. Debian and Ubuntu `sh` is dash. `sh --version` exits with `Illegal option`, and a version pin for that shell is rejected. Go understands `go1.22`, but `go build` cannot compile a `#!` line, so pin Go on the command line:
+The version stuck to the language name is dotted: `5.4`, `5.40.1`, or `1.22.5`. Perl is `perl5.40`. PHP is `php8.3`. Lua and PHP may also use two digits and no dot: `lua54` means `5.4`, and `php83` means `8.3`. A bare major in the program name, such as `lua5`, is not read.
+
+That number is a prefix of the version the program prints. `5.4` matches Lua 5.4.2. It does not match 5.5.1. The program must already be installed.
+
+A single number is only the major version, the same idea as `python3`. `--runtime-version 5` matches Lua 5.4.2 and does not match Lua 4. Put that major on the command line. `--runtime-version` wins over the first line. Raku, Janet, PowerShell, and Red have no version in the program name, so use that flag. Bash and zsh report a version, so the flag works for them. Debian and Ubuntu `sh` is dash. `sh --version` exits with `Illegal option`, and a version pin for that shell is rejected. Go understands `go1.22`, but `go build` cannot compile a `#!` line, so pin Go on the command line:
 
 ```sh
 ./devkit-deps run --runtime-version 1.22 samples/hello.go
@@ -46,7 +63,7 @@ devkit-deps doctor [flags]
 
 Flags: `--lang`, `--runtime`, `--runtime-version`, `--shell`, `--manager`, `--cache-dir`, `--rebuild`, `--no-prepare`, `--setup-timeout`, `--timeout`, `--json`.
 
-`--runtime` is an absolute path to the interpreter. `--runtime-version` asks for that version, and it wins over a versioned shebang name such as `lua5.4`. The tool looks for a matching binary already on the machine. It does not install one, and it does not search for a newer install. `--runtime` and `--runtime-version` are rejected for `tcl` and `mojo`, because those runtimes come from Pixi. `--manager` is rejected for `go` and `powershell`, because that binary is both the runtime and the manager. `--shell` is `bash`, `zsh`, or `sh`, and only for shell scripts.
+`--runtime` is an absolute path to the interpreter. `--runtime-version` asks for that version, and it wins over a versioned shebang name such as `lua5.4`. A single number is the major version: `5` matches `5.4.2`. The tool looks for a matching binary already on the machine. It does not install one, and it does not search for a newer install. `--runtime` and `--runtime-version` are rejected for `tcl` and `mojo`, because those runtimes come from Pixi. `--manager` is rejected for `go` and `powershell`, because that binary is both the runtime and the manager. `--shell` is `bash`, `zsh`, or `sh`, and only for shell scripts.
 
 `--json` is valid for `plan` and `prepare`. `--setup-timeout` defaults to 600 seconds. An omitted `--timeout` means the script has no deadline. `--timeout 0` is rejected. `--rebuild` cannot be combined with `--no-prepare`.
 
