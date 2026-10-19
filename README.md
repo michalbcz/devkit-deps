@@ -4,7 +4,7 @@
 
 ## A script
 
-The comment lists packages. Each item is `name@version`. A versioned program name on the first line asks for that runtime. `lua5.4` means Lua 5.4.
+The comment lists packages. Most items are `name@version`. Janet uses `git::https://host/repo.git::revision`. Red uses `https://host/repo.git#` and a 40-character commit. A Mojo PyPI package starts with `pypi:`. A versioned program name on the first line asks for that runtime. `lua5.4` means Lua 5.4.
 
 ```lua
 #!/usr/bin/env lua5.4
@@ -16,15 +16,15 @@ print(lustache:render("Hello, {{name}}!", { name = "world" }))
 
 ```sh
 go build -o devkit-deps ./cmd/devkit-deps
-devkit-deps run samples/hello.lua
+./devkit-deps run samples/hello.lua
 ```
 
 `5.4` matches Lua 5.4.2. It does not match 5.5. Lua must already be installed.
 
-The same first-line form works for Perl (`perl5.40`) and PHP (`php8.3`). `--runtime-version 5.4` asks for the same thing and wins over the first line. Raku, Janet, PowerShell, shell, and Red have no version in the program name, so use that flag. Go understands `go1.22`, but `go build` cannot compile a `#!` line, so pin Go on the command line:
+The same first-line form works for Perl (`perl5.40`) and PHP (`php8.3`). `--runtime-version 5.4` asks for the same thing and wins over the first line. Raku, Janet, PowerShell, and Red have no version in the program name, so use that flag. Bash and zsh report a version, so the flag works for them. Debian and Ubuntu `sh` is dash. `sh --version` exits with `Illegal option`, and a version pin for that shell is rejected. Go understands `go1.22`, but `go build` cannot compile a `#!` line, so pin Go on the command line:
 
 ```sh
-devkit-deps run --runtime-version 1.22 samples/hello.go
+./devkit-deps run --runtime-version 1.22 samples/hello.go
 ```
 
 Tcl and Mojo take their runtime from Pixi. A host version in those scripts is not used.
