@@ -40,6 +40,8 @@ func TestSamplesDeclareDependenciesAndRuntime(t *testing.T) {
 		{file: "hello.mojo", lang: lang.Mojo, specs: []string{"pypi:humanize@4.12.2"}, probe: "1.1.0"},
 		{file: "hello.sh", lang: lang.Shell, specs: []string{"ripgrep@15.1.0"}, probe: "5.2.15"},
 		{file: "hello.red", lang: lang.Red, specs: []string{"https://github.com/rebolek/red-tools.git#565774c8fb6f1817e04393fa5f034fe6d363c17f"}, probe: "0.6.36"},
+		{file: "hello.js", lang: lang.Node, runtimeVersion: "20", specs: []string{"left-pad@1.3.0"}, probe: "v20.11.1"},
+		{file: "hello.R", lang: lang.R, specs: []string{"praise@1.0.0"}, probe: "R scripting front-end version 4.4.1 (2024-06-14)"},
 	}
 	seen := map[string]struct{}{}
 	for _, item := range catalog {

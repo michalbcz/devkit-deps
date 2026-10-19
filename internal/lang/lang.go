@@ -22,6 +22,8 @@ const (
 	Mojo       ID = "mojo"
 	Shell      ID = "shell"
 	Red        ID = "red"
+	Node       ID = "node"
+	R          ID = "r"
 )
 
 type Dialect string
@@ -41,6 +43,7 @@ type Source struct {
 var (
 	dottedVersion = regexp.MustCompile(`^\d+(?:\.\d+)+$`)
 	compactTwo    = regexp.MustCompile(`^\d{2}$`)
+	allDigits     = regexp.MustCompile(`^\d+$`)
 )
 
 var extensions = map[string]ID{
@@ -48,6 +51,7 @@ var extensions = map[string]ID{
 	".janet": Janet, ".lua": Lua, ".go": GoLang, ".ps1": PowerShell,
 	".tcl": Tcl, ".mojo": Mojo, ".sh": Shell, ".bash": Shell, ".zsh": Shell,
 	".red": Red,
+	".js":  Node, ".mjs": Node, ".cjs": Node, ".r": R,
 }
 
 var plainInterpreters = map[string]ID{
@@ -56,18 +60,20 @@ var plainInterpreters = map[string]ID{
 	"pwsh": PowerShell, "powershell": PowerShell,
 	"tclsh": Tcl, "mojo": Mojo,
 	"bash": Shell, "zsh": Shell, "sh": Shell,
-	"red": Red,
+	"red":  Red,
+	"node": Node, "nodejs": Node,
+	"Rscript": R,
 }
 
 func CommentPrefix(id ID) (string, error) {
 	switch id {
-	case PHP, GoLang:
+	case PHP, GoLang, Node:
 		return "//", nil
 	case Lua:
 		return "--", nil
 	case Red:
 		return ";", nil
-	case Perl, Raku, Janet, PowerShell, Tcl, Mojo, Shell:
+	case Perl, Raku, Janet, PowerShell, Tcl, Mojo, Shell, R:
 		return "#", nil
 	default:
 		return "", &diag.Diagnostic{Code: "language.unknown", Message: "unknown language " + string(id), Phase: diag.PhaseCLI, Exit: 2}
@@ -168,6 +174,7 @@ func splitVersioned(base string) (ID, string, bool) {
 		{"php", PHP},
 		{"lua", Lua},
 		{"go", GoLang},
+		{"node", Node},
 	} {
 		if !strings.HasPrefix(base, item.name) || len(base) == len(item.name) {
 			continue
@@ -178,6 +185,10 @@ func splitVersioned(base string) (ID, string, bool) {
 		}
 		if (item.name == "lua" || item.name == "php") && compactTwo.MatchString(rest) {
 			return item.id, rest[:1] + "." + rest[1:], true
+		}
+		// node20 is Node 20. lua5 and php8 stay unrecognized.
+		if item.name == "node" && allDigits.MatchString(rest) {
+			return item.id, rest, true
 		}
 	}
 	return "", "", false

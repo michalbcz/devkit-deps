@@ -45,6 +45,9 @@ func TestAcceptedFixturePins(t *testing.T) {
 		{lang.Mojo, "pypi:humanize@4.12.2"},
 		{lang.Shell, "ripgrep@15.1.0"},
 		{lang.Red, "https://github.com/rebolek/red-tools.git#565774c8fb6f1817e04393fa5f034fe6d363c17f"},
+		{lang.Node, "left-pad@1.3.0"},
+		{lang.Node, "@sindresorhus/is@4.6.0"},
+		{lang.R, "praise@1.0.0"},
 	}
 	for _, tc := range cases {
 		pkgs, d := Validate(tc.id, []string{tc.spec})
@@ -65,12 +68,23 @@ func TestRejectedNames(t *testing.T) {
 		{lang.GoLang, "quote@v1", "package.spec"},
 		{lang.Red, "https://host/repo.git#abc", "package.spec"},
 		{lang.Shell, "pypi:humanize@4.12.2", "package.prefix"},
+		{lang.Node, "Left-Pad@1.0.0", "package.spec"},
+		{lang.Node, "@scope@1.0.0", "package.spec"},
+		{lang.R, "1praise@1.0.0", "package.spec"},
+		{lang.R, "praise", "package.spec"},
 	}
 	for _, tc := range cases {
 		_, d := Validate(tc.id, []string{tc.spec})
 		if d == nil || d.Code != tc.code || d.Exit != 2 {
 			t.Fatalf("%s %s -> %+v", tc.id, tc.spec, d)
 		}
+	}
+}
+
+func TestNodeScopedNameKeepsScope(t *testing.T) {
+	pkgs, d := Validate(lang.Node, []string{"@sindresorhus/is@4.6.0"})
+	if d != nil || pkgs[0].Name != "@sindresorhus/is" || pkgs[0].Version != "4.6.0" || pkgs[0].Identity != "@sindresorhus/is" {
+		t.Fatalf("%+v %+v", pkgs, d)
 	}
 }
 

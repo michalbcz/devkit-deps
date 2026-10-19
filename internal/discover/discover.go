@@ -92,7 +92,7 @@ func Discover(id lang.ID, dialect lang.Dialect, runtimeFlag, runtimeVersion, man
 		}
 		return host, nil
 	}
-	if (id == lang.GoLang || id == lang.PowerShell) && managerFlag != "" {
+	if runtimeIsManager(id) && managerFlag != "" {
 		return host, usage(id, "cli.manager", "--manager is not used when the runtime is the manager")
 	}
 	if runtimeFlag != "" && !filepath.IsAbs(runtimeFlag) {
@@ -123,7 +123,7 @@ func Discover(id lang.ID, dialect lang.Dialect, runtimeFlag, runtimeVersion, man
 		host.Origin = "missing"
 	}
 
-	if id == lang.GoLang || id == lang.PowerShell {
+	if runtimeIsManager(id) {
 		host.Manager = tool
 		host.Manager.Name = runtimeName
 		return host, nil
@@ -166,9 +166,15 @@ func conventionalRuntime(id lang.ID, dialect lang.Dialect) string {
 		return string(dialect)
 	case lang.PowerShell:
 		return "pwsh"
+	case lang.R:
+		return "Rscript"
 	default:
 		return string(id)
 	}
+}
+
+func runtimeIsManager(id lang.ID) bool {
+	return id == lang.GoLang || id == lang.PowerShell || id == lang.R
 }
 
 func managerBinary(id lang.ID) string {
@@ -183,6 +189,8 @@ func managerBinary(id lang.ID) string {
 		return "jpm"
 	case lang.Lua:
 		return "luarocks"
+	case lang.Node:
+		return "npm"
 	case lang.Shell:
 		return "pixi"
 	case lang.Red:
@@ -213,6 +221,12 @@ func versionedNames(id lang.ID, requested string) []string {
 		parts := strings.Split(requested, ".")
 		if len(parts) > 2 {
 			names = append(names, "go"+parts[0]+"."+parts[1])
+		}
+		return names
+	case lang.Node:
+		names := []string{"node" + requested}
+		if dot := strings.IndexByte(requested, '.'); dot > 0 {
+			names = append(names, "node"+requested[:dot])
 		}
 		return names
 	}
@@ -304,7 +318,7 @@ func probe(bin string, id lang.ID) string {
 	switch id {
 	case lang.GoLang:
 		args = []string{"version"}
-	case lang.Shell:
+	case lang.Shell, lang.Node, lang.R:
 		args = []string{"--version"}
 	case lang.PowerShell:
 		args = []string{"-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.ToString()"}
@@ -315,10 +329,17 @@ func probe(bin string, id lang.ID) string {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Stdin = nil
-	out, err := cmd.Output()
-	if err != nil && len(out) == 0 {
-		if combined, cerr := exec.CommandContext(ctx, bin, args...).CombinedOutput(); cerr == nil || len(combined) > 0 {
-			out = combined
+	var out []byte
+	var err error
+	if id == lang.R {
+		// Rscript --version exits 0 and writes the version to stderr.
+		out, err = cmd.CombinedOutput()
+	} else {
+		out, err = cmd.Output()
+		if err != nil && len(out) == 0 {
+			if combined, cerr := exec.CommandContext(ctx, bin, args...).CombinedOutput(); cerr == nil || len(combined) > 0 {
+				out = combined
+			}
 		}
 	}
 	line := strings.TrimSpace(string(out))

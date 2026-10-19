@@ -29,6 +29,26 @@ func TestVersionedShebangRequestsRuntime(t *testing.T) {
 	if d != nil || version != "" {
 		t.Fatalf("other-language shebang must not force a lua version: %s %v", version, d)
 	}
+	id, _, version, d = Infer("hello.js", "#!/usr/bin/env node20\n", "", "")
+	if d != nil || id != Node || version != "20" {
+		t.Fatalf("node20: id=%s version=%s err=%v", id, version, d)
+	}
+	id, _, version, d = Infer("hello.js", "#!/usr/bin/env node20.11.1\n", "", "")
+	if d != nil || id != Node || version != "20.11.1" {
+		t.Fatalf("node20.11.1: id=%s version=%s err=%v", id, version, d)
+	}
+	_, _, _, d = Infer("tool", "#!/usr/bin/env lua5\n", "", "")
+	if d == nil || d.Code != "language.shebang" {
+		t.Fatalf("lua5 must stay unread: %+v", d)
+	}
+	id, _, version, d = Infer("hello.R", "#!/usr/bin/env Rscript\n", "", "")
+	if d != nil || id != R || version != "" {
+		t.Fatalf("Rscript: id=%s version=%s err=%v", id, version, d)
+	}
+	id, _, version, d = Infer("hello.js", "#!/usr/bin/env nodejs\n", "", "")
+	if d != nil || id != Node || version != "" {
+		t.Fatalf("nodejs: id=%s version=%s err=%v", id, version, d)
+	}
 }
 
 func TestShellDefaultsToBash(t *testing.T) {
@@ -47,7 +67,7 @@ func TestShellDefaultsToBash(t *testing.T) {
 }
 
 func TestCommentPrefixes(t *testing.T) {
-	cases := map[ID]string{Perl: "#", PHP: "//", Lua: "--", Red: ";", GoLang: "//"}
+	cases := map[ID]string{Perl: "#", PHP: "//", Lua: "--", Red: ";", GoLang: "//", Node: "//", R: "#"}
 	for id, prefix := range cases {
 		got, err := CommentPrefix(id)
 		if err != nil || got != prefix {

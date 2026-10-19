@@ -180,6 +180,9 @@ func noDeps(doc Document, host discover.Host, policy Policy) Document {
 		doc.Files = []FileDoc{{Path: "<per-run-shim>", Body: redShim(policy.Script)}}
 		doc.Execution.Argv = append([]string{host.Runtime.Path, "<per-run-shim>"}, policy.ScriptArgs...)
 		doc.Execution.Environment = map[string]string{}
+	case lang.R:
+		doc.Execution.Argv = append([]string{host.Runtime.Path, "--vanilla", policy.Script}, policy.ScriptArgs...)
+		doc.Execution.Environment = map[string]string{}
 	default:
 		doc.Execution.Environment = map[string]string{}
 	}

@@ -161,7 +161,7 @@ func Execute(ctx context.Context, req Request) int {
 }
 
 func doctor(req Request) int {
-	ids := []lang.ID{lang.Perl, lang.PHP, lang.Raku, lang.Janet, lang.Lua, lang.GoLang, lang.PowerShell, lang.Tcl, lang.Mojo, lang.Shell, lang.Red}
+	ids := []lang.ID{lang.Perl, lang.PHP, lang.Raku, lang.Janet, lang.Lua, lang.GoLang, lang.PowerShell, lang.Tcl, lang.Mojo, lang.Shell, lang.Red, lang.Node, lang.R}
 	if req.Lang != "" {
 		ids = []lang.ID{lang.ID(req.Lang)}
 	}

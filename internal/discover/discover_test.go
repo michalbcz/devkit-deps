@@ -124,4 +124,101 @@ func TestVersionMatchesPrefix(t *testing.T) {
 	if !VersionMatches("Lua 5.4.7", "5.4") || VersionMatches("Lua 5.5.1", "5.4") || !VersionMatches("anything", "") {
 		t.Fatal("prefix match")
 	}
+	if !VersionMatches("v20.11.1", "20") || VersionMatches("v18.20.4", "20") {
+		t.Fatal("major match")
+	}
+}
+
+func TestNodeMajorSelectsVersionedBinary(t *testing.T) {
+	root := t.TempDir()
+	node20 := filepath.Join(root, "node20")
+	node := filepath.Join(root, "node")
+	if err := os.WriteFile(node20, []byte("#!/bin/sh\necho v20.11.1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(node, []byte("#!/bin/sh\necho v18.20.4\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var looked []string
+	look := LookerFunc(func(name string) (string, time.Time, bool) {
+		looked = append(looked, name)
+		switch name {
+		case "node20":
+			return node20, time.Unix(1, 0), true
+		case "node":
+			return node, time.Unix(1, 0), true
+		case "npm":
+			return "/tools/npm", time.Unix(1, 0), true
+		default:
+			return "", time.Time{}, false
+		}
+	})
+	host, d := Discover(lang.Node, "", "", "20", "", cache.Platform{GOOS: "darwin", GOARCH: "arm64"}, look)
+	if d != nil || host.Runtime.Path != node20 || host.Origin != "version" || host.Manager.Name != "npm" || host.Manager.Path != "/tools/npm" {
+		t.Fatalf("%+v %+v looked %v", host, d, looked)
+	}
+	if contains(looked, "node") {
+		t.Fatalf("plain node should wait until node20 misses: %v", looked)
+	}
+}
+
+func TestNodeDottedVersionFallsBackToMajorBinary(t *testing.T) {
+	root := t.TempDir()
+	node20 := filepath.Join(root, "node20")
+	if err := os.WriteFile(node20, []byte("#!/bin/sh\necho v20.11.1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var looked []string
+	look := LookerFunc(func(name string) (string, time.Time, bool) {
+		looked = append(looked, name)
+		switch name {
+		case "node20":
+			return node20, time.Unix(1, 0), true
+		case "npm":
+			return "/tools/npm", time.Unix(1, 0), true
+		default:
+			return "", time.Time{}, false
+		}
+	})
+	host, d := Discover(lang.Node, "", "", "20.11.1", "", cache.Platform{GOOS: "darwin", GOARCH: "arm64"}, look)
+	if d != nil || host.Runtime.Path != node20 || host.Origin != "version" {
+		t.Fatalf("%+v %+v looked %v", host, d, looked)
+	}
+	if len(looked) < 2 || looked[0] != "node20.11.1" || looked[1] != "node20" {
+		t.Fatalf("looked %v", looked)
+	}
+}
+
+func TestRscriptVersionOnStderr(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "Rscript")
+	body := "#!/bin/sh\necho 'R scripting front-end version 4.4.1 (2024-06-14)' >&2\n"
+	if err := os.WriteFile(bin, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	host, d := Discover(lang.R, "", "", "4.4", "", cache.Platform{GOOS: "darwin", GOARCH: "arm64"}, LookerFunc(func(name string) (string, time.Time, bool) {
+		if name != "Rscript" {
+			t.Fatalf("looked up %s", name)
+		}
+		return bin, time.Unix(1, 0), true
+	}))
+	if d != nil || host.Runtime.Path != bin || host.Manager.Path != bin || host.Manager.Name != "Rscript" || host.Origin != "path" {
+		t.Fatalf("%+v %+v", host, d)
+	}
+}
+
+func TestMissingRNamesRscript(t *testing.T) {
+	host, d := Discover(lang.R, "", "", "", "", cache.Platform{GOOS: "darwin", GOARCH: "arm64"}, LookerFunc(func(string) (string, time.Time, bool) {
+		return "", time.Time{}, false
+	}))
+	if d != nil || host.Runtime.Status != "missing" || !contains(host.MissingTools, "Rscript") || contains(host.MissingTools, "r") {
+		t.Fatalf("%+v %+v", host, d)
+	}
+}
+
+func TestRManagerFlagRejected(t *testing.T) {
+	_, d := Discover(lang.R, "", "", "", "/usr/bin/Rscript", cache.Platform{GOOS: "darwin", GOARCH: "arm64"}, nil)
+	if d == nil || d.Code != "cli.manager" || d.Exit != 2 {
+		t.Fatalf("%+v", d)
+	}
 }

@@ -260,6 +260,8 @@ func TestInstallRootsAreRequired(t *testing.T) {
 		{lang.Lua, "lustache@1.3.1-0", "lua"},
 		{lang.PowerShell, "powershell-yaml@0.4.12", "modules"},
 		{lang.Red, "https://github.com/rebolek/red-tools.git#565774c8fb6f1817e04393fa5f034fe6d363c17f", "sources/0"},
+		{lang.Node, "left-pad@1.3.0", "node_modules"},
+		{lang.R, "praise@1.0.0", "library"},
 	}
 	for _, tc := range cases {
 		host := fixedHost(tc.id, "/selected/"+string(tc.id), managerFor(tc.id))
@@ -292,6 +294,10 @@ func managerFor(id lang.ID) string {
 		return "pwsh"
 	case lang.Red:
 		return "git"
+	case lang.Node:
+		return "npm"
+	case lang.R:
+		return "Rscript"
 	default:
 		return string(id)
 	}

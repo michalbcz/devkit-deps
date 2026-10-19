@@ -25,6 +25,8 @@ var (
 	janetSpec  = regexp.MustCompile(`^git::https://\S+::[A-Za-z0-9_.-]+$`)
 	redSpec    = regexp.MustCompile(`^https://\S+#[a-fA-F0-9]{40}$`)
 	tcllibVer  = regexp.MustCompile(`^[0-9]+(\.[0-9]+)+$`)
+	npmName    = regexp.MustCompile(`^(?:@[a-z0-9~-][a-z0-9._~-]*/)?[a-z0-9~-][a-z0-9._~-]*$`)
+	rName      = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9.]*$`)
 )
 
 func Validate(id lang.ID, specs []string) ([]Package, *diag.Diagnostic) {
@@ -63,6 +65,8 @@ func one(id lang.ID, spec string) (Package, *diag.Diagnostic) {
 		return Package{Spec: spec, Name: url, Version: rev, Identity: url}, nil
 	case lang.Tcl, lang.Mojo, lang.Shell:
 		return pixi(id, spec)
+	case lang.Node:
+		return nodePackage(spec)
 	default:
 		name, version, d := split(id, spec)
 		if d != nil {
@@ -137,10 +141,26 @@ func checkName(id lang.ID, name string) *diag.Diagnostic {
 		if !strings.Contains(name, "/") || !goName.MatchString(name) {
 			return fail(id, "package.spec", "use a Go module/path@version")
 		}
+	case lang.R:
+		if !rName.MatchString(name) {
+			return fail(id, "package.spec", "use an R package name@version")
+		}
 	default:
 		return fail(id, "package.spec", "unsupported language")
 	}
 	return nil
+}
+
+func nodePackage(spec string) (Package, *diag.Diagnostic) {
+	at := strings.LastIndex(spec, "@")
+	if at <= 0 || at == len(spec)-1 {
+		return Package{}, fail(lang.Node, "package.spec", "use package@version")
+	}
+	name, version := spec[:at], spec[at+1:]
+	if !npmName.MatchString(name) || strings.HasPrefix(version, "-") || !versionRE.MatchString(version) {
+		return Package{}, fail(lang.Node, "package.spec", "use an npm package@version")
+	}
+	return Package{Spec: spec, Name: name, Version: version, Identity: name}, nil
 }
 
 func validName(name string) bool {
