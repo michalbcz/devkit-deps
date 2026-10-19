@@ -69,6 +69,9 @@ func TestUsageErrors(t *testing.T) {
 		{"run", "--not-a-flag"},
 		{"run"},
 		{"nope"},
+		{"install", "a.lua"},
+		{"install", "--json"},
+		{"install", "--rebuild"},
 	}
 	for _, args := range cases {
 		_, stderr, code := runCLI(t, "", nil, args...)

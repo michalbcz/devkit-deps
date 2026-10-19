@@ -32,11 +32,12 @@ func Parse(args []string) (engine.Request, *diag.Diagnostic) {
 	}
 	req.Command = args[0]
 	switch req.Command {
-	case "run", "prepare", "plan", "doctor":
+	case "run", "prepare", "plan", "doctor", "install":
 	default:
 		return req, usage("unknown command " + req.Command)
 	}
 	var positionals []string
+	setupTimeoutSet := false
 	for i := 1; i < len(args); i++ {
 		arg := args[i]
 		if arg == "--" {
@@ -78,6 +79,7 @@ func Parse(args []string) (engine.Request, *diag.Diagnostic) {
 			if d != nil {
 				return req, d
 			}
+			setupTimeoutSet = true
 			req.SetupTimeout = time.Duration(seconds) * time.Second
 		case "--timeout":
 			seconds, d := positiveSeconds("--timeout", value)
@@ -106,6 +108,15 @@ func Parse(args []string) (engine.Request, *diag.Diagnostic) {
 	}
 	if req.Shell != "" && req.Shell != "bash" && req.Shell != "zsh" && req.Shell != "sh" {
 		return req, usage("unknown shell " + req.Shell)
+	}
+	if req.Command == "install" {
+		if len(positionals) != 0 {
+			return req, usage("install does not take a script")
+		}
+		if req.Runtime != "" || req.RuntimeVersionSet || req.Shell != "" || req.Manager != "" || req.CacheDir != "" || req.Rebuild || req.NoPrepare || req.JSON || req.ScriptTimeout != 0 || setupTimeoutSet {
+			return req, usage("install accepts only --lang")
+		}
+		return req, nil
 	}
 	if req.Command == "doctor" {
 		if len(positionals) != 0 {

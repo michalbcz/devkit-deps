@@ -7,11 +7,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
 	"devkit-deps/internal/cache"
 	"devkit-deps/internal/diag"
+	"devkit-deps/internal/install"
 	"devkit-deps/internal/lease"
 	"devkit-deps/internal/plan"
 	"devkit-deps/internal/proc"
@@ -75,7 +77,10 @@ func Prepare(ctx context.Context, doc plan.Document, held *lease.Lease, rebuild,
 	}
 	if len(doc.MissingTools) > 0 {
 		return doc, &diag.Diagnostic{
-			Code: "tool.missing", Message: "missing " + strings.Join(doc.MissingTools, ", "),
+			Code: "tool.missing",
+			Message: install.Missing(doc.MissingTools, install.Options{
+				Brew: install.BrewOnPath(nil), GOOS: runtime.GOOS,
+			}),
 			Language: doc.Language, Phase: diag.PhaseDiscover,
 			MissingTools: append([]string{}, doc.MissingTools...), Exit: 3,
 		}

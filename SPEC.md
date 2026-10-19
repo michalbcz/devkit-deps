@@ -375,9 +375,12 @@ devkit-deps doctor --lang lua
 | `run` | Parse, validate, plan, prepare/reuse, execute |
 | `prepare` | Prepare dependencies without executing source |
 | `plan` | Show manifests, setup/execution argv, cwd/env overrides, prerequisites and runtime provenance; no installs or script evaluation |
-| `doctor` | Inspect local prerequisite paths/versions and platform support; no installs |
+| `doctor` | Inspect local prerequisite paths/versions and platform support; no installs. A missing tool's diagnostic includes the same install direction as `install` |
+| `install` | Opt-in host-tool install. When `brew` is on PATH and the tool has a Homebrew formula, or Factor's cask, run that command without sudo. Otherwise print the command or the download page. `run`, `plan`, `prepare`, and `doctor` never invoke it |
 
 Local tool-version probes are allowed for `plan`/`doctor`. Loading or evaluating source is not.
+
+`install` is the only command that may install a host runtime or manager. It does not run during `run`. On Linux without Homebrew it prints `sudo apt-get install ...` or a download page and does not run that command. `pak` is installed only when `Rscript` is already on PATH; if R itself is missing, `install` prints the `pak` command for a second run.
 
 | Option | Contract |
 |---|---|
@@ -612,7 +615,7 @@ For other adapters, transfer the complete current managed sample with its expect
 5. Signals, deadlines, child cleanup and released leases.
 6. Plan never installs/evaluates; prepare never runs source.
 7. JSON machine output parses and does not mix with progress.
-8. Missing prerequisites produce diagnostics without global installation.
+8. Missing prerequisites produce diagnostics without global installation. The explicit `install` command is the only exception, and it never runs as part of `run`.
 9. Empty/no-header source invokes no manager.
 10. Unsupported native-resolver languages do not silently reinterpret metadata.
 11. Profile/manager changes invalidate appropriate cache selections.
