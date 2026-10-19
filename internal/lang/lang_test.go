@@ -49,6 +49,18 @@ func TestVersionedShebangRequestsRuntime(t *testing.T) {
 	if d != nil || id != Node || version != "" {
 		t.Fatalf("nodejs: id=%s version=%s err=%v", id, version, d)
 	}
+	id, _, version, d = Infer("hello.fs", "#! /usr/bin/env gforth\n", "", "")
+	if d != nil || id != Forth || version != "" {
+		t.Fatalf("gforth: id=%s version=%s err=%v", id, version, d)
+	}
+	_, _, _, d = Infer("hello.odin", "#!/usr/bin/env odin2024\n", "", "")
+	if d == nil || d.Code != "language.shebang" {
+		t.Fatalf("odin2024 must stay unread: %+v", d)
+	}
+	id, _, version, d = Infer("hello.factor", "#!/usr/bin/env factor\n", "", "")
+	if d != nil || id != Factor || version != "" {
+		t.Fatalf("factor: id=%s version=%s err=%v", id, version, d)
+	}
 }
 
 func TestShellDefaultsToBash(t *testing.T) {
@@ -67,7 +79,7 @@ func TestShellDefaultsToBash(t *testing.T) {
 }
 
 func TestCommentPrefixes(t *testing.T) {
-	cases := map[ID]string{Perl: "#", PHP: "//", Lua: "--", Red: ";", GoLang: "//", Node: "//", R: "#"}
+	cases := map[ID]string{Perl: "#", PHP: "//", Lua: "--", Red: ";", GoLang: "//", Node: "//", R: "#", Odin: "//", Forth: "\\", Factor: "!", NASM: ";"}
 	for id, prefix := range cases {
 		got, err := CommentPrefix(id)
 		if err != nil || got != prefix {

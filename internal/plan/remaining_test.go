@@ -14,6 +14,15 @@ import (
 	"devkit-deps/internal/plan"
 )
 
+func ccLooker() discover.Looker {
+	return discover.LookerFunc(func(name string) (string, time.Time, bool) {
+		if name == "cc" {
+			return "/usr/bin/cc", time.Unix(1, 0), true
+		}
+		return "", time.Time{}, false
+	})
+}
+
 func gitLooker() discover.Looker {
 	return discover.LookerFunc(func(name string) (string, time.Time, bool) {
 		if name == "git" {
@@ -262,19 +271,29 @@ func TestInstallRootsAreRequired(t *testing.T) {
 		{lang.Red, "https://github.com/rebolek/red-tools.git#565774c8fb6f1817e04393fa5f034fe6d363c17f", "sources/0"},
 		{lang.Node, "left-pad@1.3.0", "node_modules"},
 		{lang.R, "praise@1.0.0", "library"},
+		{lang.Odin, "http=https://github.com/laytan/odin-http.git#fac113fbd828aad3d71479a534b5de4358b6a07b", "collections/http"},
+		{lang.Forth, "https://github.com/forthy42/gforth.git#c9536461d750ea7b7ac8b738bf8763b839ecf1b9", "sources/0"},
+		{lang.Factor, "https://github.com/mrjbq7/re-factor.git#eb488704620c49a023d77cf78d2cbcb72b9f1a73", "sources/0"},
+		{lang.NASM, "https://github.com/netwide-assembler/nasm.git#fbdc88565ccccfa0e8c69b21b1953d1eded02e89", "sources/0"},
 	}
 	for _, tc := range cases {
 		host := fixedHost(tc.id, "/selected/"+string(tc.id), managerFor(tc.id))
 		if tc.id == lang.Lua {
 			host.Runtime.Version = "Lua 5.4.7"
 		}
-		doc, d := plan.Build(parse.Declaration{Kind: parse.KindDependencies}, mustPkgs(t, tc.id, tc.spec), host, plan.Policy{
-			CacheRoot: "/cache/devkit-deps", Script: "/work/a", CallerCwd: "/caller",
-		})
+		policy := plan.Policy{CacheRoot: "/cache/devkit-deps", Script: "/work/a", CallerCwd: "/caller"}
+		if tc.id == lang.NASM {
+			policy.Look = ccLooker()
+		}
+		doc, d := plan.Build(parse.Declaration{Kind: parse.KindDependencies}, mustPkgs(t, tc.id, tc.spec), host, policy)
 		if d != nil {
 			t.Fatalf("%s: %+v", tc.id, d)
 		}
-		if !reflect.DeepEqual(doc.RequiredFiles, []string{tc.root}) {
+		want := []string{tc.root}
+		if tc.id == lang.Forth {
+			want = []string{"sources/0", "prelude.fs"}
+		}
+		if !reflect.DeepEqual(doc.RequiredFiles, want) {
 			t.Fatalf("%s required %#v", tc.id, doc.RequiredFiles)
 		}
 	}
@@ -298,6 +317,8 @@ func managerFor(id lang.ID) string {
 		return "npm"
 	case lang.R:
 		return "Rscript"
+	case lang.Odin, lang.Forth, lang.Factor, lang.NASM:
+		return "git"
 	default:
 		return string(id)
 	}

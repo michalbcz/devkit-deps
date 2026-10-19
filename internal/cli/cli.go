@@ -122,7 +122,7 @@ func Parse(args []string) (engine.Request, *diag.Diagnostic) {
 
 func knownLang(id string) bool {
 	switch lang.ID(id) {
-	case lang.Perl, lang.PHP, lang.Raku, lang.Janet, lang.Lua, lang.GoLang, lang.PowerShell, lang.Tcl, lang.Mojo, lang.Shell, lang.Red, lang.Node, lang.R:
+	case lang.Perl, lang.PHP, lang.Raku, lang.Janet, lang.Lua, lang.GoLang, lang.PowerShell, lang.Tcl, lang.Mojo, lang.Shell, lang.Red, lang.Node, lang.R, lang.Odin, lang.Forth, lang.Factor, lang.NASM:
 		return true
 	default:
 		return false

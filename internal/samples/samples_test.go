@@ -42,6 +42,10 @@ func TestSamplesDeclareDependenciesAndRuntime(t *testing.T) {
 		{file: "hello.red", lang: lang.Red, specs: []string{"https://github.com/rebolek/red-tools.git#565774c8fb6f1817e04393fa5f034fe6d363c17f"}, probe: "0.6.36"},
 		{file: "hello.js", lang: lang.Node, runtimeVersion: "20", specs: []string{"left-pad@1.3.0"}, probe: "v20.11.1"},
 		{file: "hello.R", lang: lang.R, specs: []string{"praise@1.0.0"}, probe: "R scripting front-end version 4.4.1 (2024-06-14)"},
+		{file: "hello.odin", lang: lang.Odin, specs: []string{"http=https://github.com/laytan/odin-http.git#fac113fbd828aad3d71479a534b5de4358b6a07b"}, probe: "odin version dev-2025-01"},
+		{file: "hello.fs", lang: lang.Forth, specs: []string{"https://github.com/forthy42/gforth.git#c9536461d750ea7b7ac8b738bf8763b839ecf1b9"}, probe: "gforth 0.7.3"},
+		{file: "hello.factor", lang: lang.Factor, specs: []string{"https://github.com/mrjbq7/re-factor.git#eb488704620c49a023d77cf78d2cbcb72b9f1a73"}, probe: "0.99"},
+		{file: "hello.asm", lang: lang.NASM, specs: []string{"https://github.com/netwide-assembler/nasm.git#fbdc88565ccccfa0e8c69b21b1953d1eded02e89"}, probe: "NASM version 2.16.01"},
 	}
 	seen := map[string]struct{}{}
 	for _, item := range catalog {

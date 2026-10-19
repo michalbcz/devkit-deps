@@ -216,6 +216,19 @@ func TestMissingRNamesRscript(t *testing.T) {
 	}
 }
 
+func TestForthAndNASMNameTheirHostTools(t *testing.T) {
+	platform := cache.Platform{GOOS: "darwin", GOARCH: "arm64"}
+	miss := LookerFunc(func(string) (string, time.Time, bool) { return "", time.Time{}, false })
+	host, d := Discover(lang.Forth, "", "", "", "", platform, miss)
+	if d != nil || !contains(host.MissingTools, "gforth") || !contains(host.MissingTools, "git") || contains(host.MissingTools, "forth") {
+		t.Fatalf("forth %+v %+v", host, d)
+	}
+	host, d = Discover(lang.NASM, "", "", "", "", platform, miss)
+	if d != nil || !contains(host.MissingTools, "nasm") || !contains(host.MissingTools, "git") || !contains(host.MissingTools, "cc") {
+		t.Fatalf("nasm %+v %+v", host, d)
+	}
+}
+
 func TestRManagerFlagRejected(t *testing.T) {
 	_, d := Discover(lang.R, "", "", "", "/usr/bin/Rscript", cache.Platform{GOOS: "darwin", GOARCH: "arm64"}, nil)
 	if d == nil || d.Code != "cli.manager" || d.Exit != 2 {

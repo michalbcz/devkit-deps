@@ -48,9 +48,20 @@ These two adapters were added after the eleven-adapter baseline. They use the sa
 | `node` | npm | Selected host Node. `node20` requests major 20. `nodejs` is the unversioned name. Packages are installed with `npm install` into the cache and exposed through `NODE_PATH` for `require()`. This adapter does not read Node's older `// deps:` syntax. |
 | `r` | `pak::pkg_install` | Selected host `Rscript`. There is no version in the program name. `pak` must already be installed for that R. `--manager` is rejected because `Rscript` is the manager. Installed packages are exposed through `R_LIBS`. |
 
+### Source checkouts
+
+These four adapters were added for languages that have no package tool for a one-file script. The compiler or interpreter must already be installed. Dependencies are git checkouts pinned like Red: `https://host/repository.git#` plus a full 40-hex commit. `--manager` selects `git`. An empty declaration does not need `git`.
+
+| Language ID | Resolver | Runtime |
+|---|---|---|
+| `odin` | Git checkout of each package under `E/collections/<name>` | Selected host `odin`. Spec is `name=https://repository.git#<40-hex>`. Build is `odin build <file> -file -collection:deps=E/collections -out:<per-run-binary>`. Import `deps:<name>`. `odin version` prints a date, so `--runtime-version` does not match it. |
+| `forth` | Git checkout added with `s" <dir>" fpath also-path` | Selected host `gforth`. The language id is `forth`. A prelude is `E/prelude.fs`. Execution is `gforth --no-rc <prelude> <script> <args>` with `GFORTH_ENV=off`. `--path` is not used, because it replaces the default search path. Arguments are Gforth OS arguments (`next-arg`). The script should end with `bye`. The shebang Gforth itself ignores is `#! /usr/bin/env gforth` with a space after `#!`. |
+| `factor` | Git checkout passed to `-roots` | Selected host `factor`. Execution is `factor -no-user-init -roots=<dir1>:<dir2> <script> <args>`. The separator is `:` on Unix and `;` on Windows. The `!` declaration must appear before `USING:`. |
+| `nasm` | Git checkout passed to `-i` | Selected host `nasm`, linked with the existing `cc`. `.asm` means NASM, not the GNU assembler. darwin uses `-f macho64` and `cc -arch x86_64` (Apple silicon needs Rosetta). `linux/amd64` uses `-f elf64`. Any other OS or CPU is `platform.unsupported`. The object file is `<per-run-binary>.o`. |
+
 ### Exclusions
 
-Python/uv PEP 723, Java/JBang, Kotlin main-kts, Groovy/Grape, Ruby/Bundler, Deno/Bun imports, .NET NuGet and Julia/Pkg are separate mechanisms. Node's older app-specific `// deps:` syntax is separate too. Do not conflate them with `devkit-deps` or bring the embedded Kotlin/Groovy hosts into the CLI. Native-resolver dispatch can be a later explicit feature.
+Python/uv PEP 723, Java/JBang, Kotlin main-kts, Groovy/Grape, Ruby/Bundler, Deno/Bun imports, .NET NuGet, Julia/Pkg, DUB single-file packages, SwiftPM `Package.swift`, CocoaPods, Conan, vcpkg, build2, clib, Nimble, Atlas, Zig `build.zig.zon`, rebar3/Hex, Gleam `gleam.toml`, Free Pascal `fppkg` and the Lazarus Online Package Manager are separate mechanisms. Node's older app-specific `// deps:` syntax is separate too. Do not conflate them with `devkit-deps` or bring the embedded Kotlin/Groovy hosts into the CLI. Native-resolver dispatch can be a later explicit feature. There is no single C or C++ script syntax to wrap.
 
 Defer remote-script URLs, stdin-as-source, arbitrary project execution, automatic global runtime installation, custom setup hooks, universal lockfiles and cache garbage collection. Local single-file scripts are sufficient.
 
@@ -92,11 +103,13 @@ One physical comment line contains the exact case-sensitive key `devkit-deps:` a
 | Languages | Prefix | Example |
 |---|---|---|
 | Perl, Raku, Janet, Tcl, Mojo, shell, PowerShell, R | `#` | `# devkit-deps: ["Try::Tiny@0.32"]` |
-| PHP, Go, Node | `//` | `// devkit-deps: ["rsc.io/quote/v4@v4.0.1"]` |
+| PHP, Go, Node, Odin | `//` | `// devkit-deps: ["rsc.io/quote/v4@v4.0.1"]` |
 | Lua | `--` | `-- devkit-deps: ["lustache@1.3.1-0"]` |
-| Red | `;` | `; devkit-deps: ["https://host/repository.git#<40-hex-commit>"]` |
+| Forth | `\` | `\ devkit-deps: ["https://host/repository.git#<40-hex-commit>"]` |
+| Factor | `!` | `! devkit-deps: ["https://host/repository.git#<40-hex-commit>"]` |
+| Red, NASM | `;` | `; devkit-deps: ["https://host/repository.git#<40-hex-commit>"]` |
 
-Node and R were added after the eleven-adapter baseline. They use this same comment key. A Node example is `// devkit-deps: ["left-pad@1.3.0"]`.
+Node, R, Odin, Forth, Factor and NASM were added after the eleven-adapter baseline. They use this same comment key. A Node example is `// devkit-deps: ["left-pad@1.3.0"]`. An Odin example is `// devkit-deps: ["http=https://host/repository.git#<40-hex-commit>"]`. Factor's declaration has to precede `USING:`. Odin's declaration has to precede `package`.
 
 Whitespace before the prefix, between prefix and key, and around JSON is accepted. Multiline arrays, environment interpolation, command substitution and executable expressions are not supported.
 
@@ -174,6 +187,8 @@ The common name check requires a letter/digit first character and rejects whites
 | Red | HTTPS repository URL plus `#` and a full 40-hexadecimal commit |
 | Node | `package@version`, including a scoped `@scope/name@version`; name `^(?:@[a-z0-9~-][a-z0-9._~-]*/)?[a-z0-9~-][a-z0-9._~-]*$` |
 | R | `package@version`; name `[A-Za-z][A-Za-z0-9.]*` |
+| Odin | `name=https://repository.git#<40-hex>`; name `[A-Za-z_][A-Za-z0-9_]*` |
+| Forth, Factor, NASM | HTTPS repository URL plus `#` and a full 40-hexadecimal commit, same pin as Red |
 
 Pixi accepts optional `conda:` prefixes. `pypi:` is supported only for Mojo. Its package names are restricted to `[A-Za-z0-9_.-]+`. Numeric-leading versions become `==VERSION` in manifests; constraints such as `>=3.11,<3.12` are retained.
 
@@ -303,6 +318,10 @@ git -C E/sources/N checkout --quiet --detach FETCH_HEAD
 Set `GIT_TERMINAL_PROMPT=0`. Source explicitly loads files below `DEVKIT_DEPS_DIR/sources/N`. Do not enable recursive submodules implicitly.
 
 The desktop uses a Red shim that catches errors from `do %script.red` and calls `quit/return 1`; otherwise printed script errors can leave a successful process exit. Standalone execution needs an absolute-source-path shim and verified argument forwarding.
+
+### Odin, Forth, Factor and NASM
+
+These reuse the Red checkout above. Odin places commit `N` at `E/collections/<name>` and compiles with the host `odin` to `<per-run-binary>` before execution. Forth writes `E/prelude.fs` and runs `gforth --no-rc E/prelude.fs S`. Factor runs `factor -no-user-init -roots=... S`. NASM runs `nasm -f <macho64|elf64> -i<dir> -o <per-run-binary>.o S` and then `cc -o <per-run-binary> <per-run-binary>.o`. NASM still assembles when the declaration is empty. The other three run the interpreter directly when the declaration is empty, and that path does not require `git`.
 
 ## 7. Current cache, locks and subprocess behavior
 

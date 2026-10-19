@@ -24,6 +24,8 @@ var (
 	goName     = regexp.MustCompile(`^[A-Za-z0-9_./~-]+$`)
 	janetSpec  = regexp.MustCompile(`^git::https://\S+::[A-Za-z0-9_.-]+$`)
 	redSpec    = regexp.MustCompile(`^https://\S+#[a-fA-F0-9]{40}$`)
+	odinSpec   = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=https://\S+#[a-fA-F0-9]{40}$`)
+	odinName   = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	tcllibVer  = regexp.MustCompile(`^[0-9]+(\.[0-9]+)+$`)
 	npmName    = regexp.MustCompile(`^(?:@[a-z0-9~-][a-z0-9._~-]*/)?[a-z0-9~-][a-z0-9._~-]*$`)
 	rName      = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9.]*$`)
@@ -57,12 +59,15 @@ func one(id lang.ID, spec string) (Package, *diag.Diagnostic) {
 		rev := rest[strings.LastIndex(rest, "::")+2:]
 		return Package{Spec: spec, Name: repo, Version: rev, Identity: repo}, nil
 	case lang.Red:
-		if !redSpec.MatchString(spec) {
-			return Package{}, fail(id, "package.spec", "Red source dependencies use https://repository.git#full-40-character-commit")
-		}
-		url := spec[:strings.LastIndex(spec, "#")]
-		rev := spec[strings.LastIndex(spec, "#")+1:]
-		return Package{Spec: spec, Name: url, Version: rev, Identity: url}, nil
+		return gitPin(id, spec, "Red source dependencies use https://repository.git#full-40-character-commit")
+	case lang.Forth:
+		return gitPin(id, spec, "Forth source dependencies use https://repository.git#full-40-character-commit")
+	case lang.Factor:
+		return gitPin(id, spec, "Factor vocabulary roots use https://repository.git#full-40-character-commit")
+	case lang.NASM:
+		return gitPin(id, spec, "NASM include directories use https://repository.git#full-40-character-commit")
+	case lang.Odin:
+		return odinPackage(spec)
 	case lang.Tcl, lang.Mojo, lang.Shell:
 		return pixi(id, spec)
 	case lang.Node:
@@ -149,6 +154,30 @@ func checkName(id lang.ID, name string) *diag.Diagnostic {
 		return fail(id, "package.spec", "unsupported language")
 	}
 	return nil
+}
+
+func gitPin(id lang.ID, spec, message string) (Package, *diag.Diagnostic) {
+	if !redSpec.MatchString(spec) {
+		return Package{}, fail(id, "package.spec", message)
+	}
+	url := spec[:strings.LastIndex(spec, "#")]
+	rev := spec[strings.LastIndex(spec, "#")+1:]
+	return Package{Spec: spec, Name: url, Version: rev, Identity: url}, nil
+}
+
+func odinPackage(spec string) (Package, *diag.Diagnostic) {
+	message := "Odin collections use name=https://repository.git#full-40-character-commit"
+	eq := strings.IndexByte(spec, '=')
+	if eq <= 0 || !odinSpec.MatchString(spec) {
+		return Package{}, fail(lang.Odin, "package.spec", message)
+	}
+	name, rest := spec[:eq], spec[eq+1:]
+	if !odinName.MatchString(name) || !redSpec.MatchString(rest) {
+		return Package{}, fail(lang.Odin, "package.spec", message)
+	}
+	url := rest[:strings.LastIndex(rest, "#")]
+	rev := rest[strings.LastIndex(rest, "#")+1:]
+	return Package{Spec: spec, Name: url, Version: rev, Identity: name}, nil
 }
 
 func nodePackage(spec string) (Package, *diag.Diagnostic) {
