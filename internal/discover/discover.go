@@ -47,6 +47,7 @@ func (f LookerFunc) Look(name string) (string, time.Time, bool) { return f(name)
 var (
 	dottedNumber = regexp.MustCompile(`\d+(?:\.\d+)+`)
 	luaABI       = regexp.MustCompile(`5\.\d+`)
+	factorVM     = regexp.MustCompile(`^\d+\.\d+`)
 )
 
 func VersionMatches(probed, requested string) bool {
@@ -299,8 +300,13 @@ func inspectPath(id lang.ID, path, requested, name string) (Tool, *diag.Diagnost
 }
 
 func finishProbe(id lang.ID, path string, mod time.Time, requested, name string) (Tool, *diag.Diagnostic) {
-	line := probe(path, id)
+	line, ok := probe(path, id)
 	tool := Tool{Name: name, Path: path, ModTime: mod, Version: line, RequestedVersion: requested, Status: "ok"}
+	// GNU coreutils ships a different program named factor. Its -e probe exits 1.
+	// A Factor VM exits 0 and prints vm-version, such as 0.99.
+	if id == lang.Factor && (!ok || !factorVM.MatchString(line)) {
+		return Tool{Name: name, RequestedVersion: requested, Status: "missing"}, nil
+	}
 	if requested != "" && !VersionMatches(line, requested) {
 		return Tool{}, &diag.Diagnostic{
 			Code: "runtime.version", Exit: 3, Phase: diag.PhaseDiscover, Language: string(id),
@@ -320,7 +326,7 @@ func finishProbe(id lang.ID, path string, mod time.Time, requested, name string)
 	return tool, nil
 }
 
-func probe(bin string, id lang.ID) string {
+func probe(bin string, id lang.ID) (string, bool) {
 	args := []string{"-v"}
 	switch id {
 	case lang.GoLang, lang.Odin:
@@ -355,7 +361,7 @@ func probe(bin string, id lang.ID) string {
 	if i := strings.IndexAny(line, "\r\n"); i >= 0 {
 		line = strings.TrimSpace(line[:i])
 	}
-	return line
+	return line, err == nil
 }
 
 func ResolveSibling(toolPath string, names []string) (string, error) {
@@ -404,6 +410,9 @@ func ZefLaunch(toolPath string) (string, []string, error) {
 func usage(id lang.ID, code, message string) *diag.Diagnostic {
 	return &diag.Diagnostic{Code: code, Message: message, Language: string(id), Phase: diag.PhaseCLI, Exit: 2}
 }
+
+// PathLooker searches PATH and the per-user fallbacks. Discover uses it when no looker is supplied.
+func PathLooker() Looker { return defaultLooker{} }
 
 type defaultLooker struct{}
 

@@ -216,6 +216,41 @@ func TestMissingRNamesRscript(t *testing.T) {
 	}
 }
 
+func TestFactorProbeRejectsCoreutils(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "factor")
+	script := "#!/bin/sh\necho \"factor: invalid option -- e\" >&2\nexit 1\n"
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	platform := cache.Platform{GOOS: "darwin", GOARCH: "arm64"}
+	look := LookerFunc(func(name string) (string, time.Time, bool) {
+		if name == "factor" {
+			return bin, time.Unix(1, 0), true
+		}
+		return "", time.Time{}, false
+	})
+	host, d := Discover(lang.Factor, "", "", "", "", platform, look)
+	if d != nil || host.Runtime.Status != "missing" || host.Runtime.Path != "" || !contains(host.MissingTools, "factor") {
+		t.Fatalf("%+v %+v", host, d)
+	}
+
+	vm := filepath.Join(dir, "factor-vm")
+	if err := os.WriteFile(vm, []byte("#!/bin/sh\necho 0.99\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	look = LookerFunc(func(name string) (string, time.Time, bool) {
+		if name == "factor" {
+			return vm, time.Unix(1, 0), true
+		}
+		return "", time.Time{}, false
+	})
+	host, d = Discover(lang.Factor, "", "", "", "", platform, look)
+	if d != nil || host.Runtime.Status != "ok" || host.Runtime.Path != vm || host.Runtime.Version != "0.99" {
+		t.Fatalf("%+v %+v", host, d)
+	}
+}
+
 func TestForthAndNASMNameTheirHostTools(t *testing.T) {
 	platform := cache.Platform{GOOS: "darwin", GOARCH: "arm64"}
 	miss := LookerFunc(func(string) (string, time.Time, bool) { return "", time.Time{}, false })
