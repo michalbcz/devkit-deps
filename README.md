@@ -1,23 +1,80 @@
 # devkit-deps
 
-A comment names the packages. `devkit-deps run` installs them and runs the script.
+A comment names the packages. `devkit-deps run` installs them and runs the script. The language's own interpreter ignores the comment.
+
+Lua:
 
 ```lua
 #!/usr/bin/env lua5.4
+-- lua5.4 asks for Lua 5.4, a prefix of the version lua prints.
 -- devkit-deps: ["lustache@1.3.1-0"]
+-- devkit-deps run installs the rock with LuaRocks and sets LUA_PATH.
+-- require() loads it from there. lua itself skips these comments.
 
 local lustache = require("lustache")
 print(lustache:render("Hello, {{name}}!", { name = "world" }))
 ```
 
+PHP:
+
+```php
+#!/usr/bin/env php8.3
+<?php
+// php8.3 asks for PHP 8.3, a prefix of the version php prints.
+// The package line stays after <?php. Composer installs vendor/package@version.
+// devkit-deps: ["symfony/yaml@7.4.21"]
+// devkit-deps run prepends php/vendor/autoload.php. DEVKIT_DEPS_DIR is that cache.
+// This require loads the same autoloader. php itself skips these comments.
+
+require getenv('DEVKIT_DEPS_DIR') . '/php/vendor/autoload.php';
+
+use Symfony\Component\Yaml\Yaml;
+
+echo Yaml::parse("hello: world\n")['hello'], "\n";
+```
+
+Perl:
+
+```perl
+#!/usr/bin/env perl5.40
+# perl5.40 asks for Perl 5.40, a prefix of the version perl prints.
+# devkit-deps: ["Try::Tiny@0.32"]
+# devkit-deps run installs the module with cpanm into a local lib and sets PERL5LIB.
+# use finds it there. perl itself skips these comments.
+
+use strict;
+use warnings;
+use Try::Tiny;
+
+try {
+    die "boom\n";
+} catch {
+    print "caught\n";
+};
+```
+
+JavaScript (Node.js):
+
+```javascript
+#!/usr/bin/env node20
+// node20 asks for Node 20. Node reads a bare major from the program name.
+// devkit-deps: ["left-pad@1.3.0"]
+// devkit-deps run installs the package with npm and sets NODE_PATH.
+// require() loads it from there. node itself skips these comments.
+
+const leftPad = require("left-pad");
+console.log(leftPad("hi", 5, "."));
+```
+
 ```sh
 go build -o devkit-deps ./cmd/devkit-deps
 ./devkit-deps run samples/hello.lua
+./devkit-deps run samples/hello.php
+./devkit-deps run samples/hello.pl
+./devkit-deps run samples/hello.js
 ```
 
-`lua5.4` means Lua 5.4. Each package is `name@version`. A normal interpreter ignores the comment.
-
-`samples/` has one short script per language, including Perl, PHP, Go, PowerShell, Node, and R. The build needs Go 1.22 or newer. The language runtime, and its package manager, must already be installed.
+`samples/` has one short script per language. The build needs Go 1.22 or newer. The language runtime, and its package manager, must already be installed.
 
 ## Runtime version
 
